@@ -1,6 +1,6 @@
 #!/bin/sh -e
-cp /sample.tsv /data/
 mkdir -p /data/index/
+cp /sample.tsv /data/
 # Index files
 /usr/bin/indexer -c /etc/sphinx/sphinx.conf --rotate --all
 # Start sphinx job in supervisor

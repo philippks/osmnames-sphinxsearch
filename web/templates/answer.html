@@ -1,7 +1,9 @@
 {% extends "layout.html" %}
-{% block title %}- Home{% endblock %}
+{% block title %}- Results{% endblock %}
 {% block result %}
 <hr>
+{% if rc %}
+<p>Found <b>{{ result | length }}</b> results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">
   <tr>
     <th></th>
@@ -13,7 +15,7 @@
     <th>bounding box</th>
     <th>lat, lon</th>
   </tr>
-  {% for row in results %}
+  {% for row in result %}
   <tr>
     <td>{{ loop.index }}</td>
     {% for col in ('osm_id', 'display_name', 'name', 'class', 'type', 'bbox', 'latlon') %}
@@ -26,4 +28,10 @@
   </tr>
   {% endfor %}
 </table>
+{% else %}
+<p>Found 0 results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
+<pre>
+  {{ result | nl2br | safe}}
+</pre>
+{% endif %}
 {% endblock %}

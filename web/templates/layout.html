@@ -13,7 +13,7 @@
 <div class="container main">
 
   <h1>OSM Names full text search</h1>
-  {% block search_input %}
+{% block search_input %}
 <form name="display_name" action="/displayName" method="get">
 Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value="" class="autocomplete-nominatim" /><br/>
 <input type="hidden" name="format" value="html" />
@@ -30,7 +30,7 @@ Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value
 <script>
 {% block script %}
 function load() {
-    new kt.Nominatim(document.getElementById('autocomplete'), '/displayName');
+    new kt.Nominatim(document.getElementById('autocomplete'), '/search');
 }
 {% endblock %}
 </script>

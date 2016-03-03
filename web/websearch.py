@@ -17,6 +17,7 @@ from os import getenv
 
 app = Flask(__name__, template_folder='templates/')
 app.debug = not getenv('WEBSEARCH_DEBUG') is None
+app.debug = True
 
 # Name for Sphinx searchd Link name
 # SPHINX_LINK_NAME = getenv('SPHINX_LINK_NAME')
@@ -52,98 +53,107 @@ app.debug = not getenv('WEBSEARCH_DEBUG') is None
 Process query to Sphinx searchd
 """
 def process_query(ret, index, query):
-  # default server configuration
-  host = 'localhost'
-  port = 9312
-  # try:
-  #   if SPHINX_LINK_NAME:
-  #     host = getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_ADDR')
-  #     if host:
-  #       port = int(getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_PORT'))
-  #     else:
-  #       host = 'localhost'
-  # except Exception, e:
-  #   ret['error'] = 'Cannot connect to sphinx: ' + str(e)
-  #   return False, None
+    # default server configuration
+    host = 'localhost'
+    port = 9312
+    if getenv('WEBSEARCH_SERVER'):
+        host = getenv('WEBSEARCH_SERVER')
+    if getenv('WEBSEARCH_SERVER_PORT'):
+        port = int(getenv('WEBSEARCH_SERVER_PORT'))
+    pprint([host, port, getenv('WEBSEARCH_SERVER')])
+    # try:
+    #   if SPHINX_LINK_NAME:
+    #     host = getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_ADDR')
+    #     if host:
+    #       port = int(getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_PORT'))
+    #     else:
+    #       host = 'localhost'
+    # except Exception, e:
+    #   ret['error'] = 'Cannot connect to sphinx: ' + str(e)
+    #   return False, None
 
-  # if index in indexPorts:
-    # index = indexPorts[index]
+    # if index in indexPorts:
+        # index = indexPorts[index]
 
-  repeat = 3
-  # Repeate 3 times request because of socket.timeout
-  while repeat > 0:
-    try:
-      cl = SphinxClient()
-      cl.SetServer (host, port)
-      cl.SetConnectTimeout(0.5) # float seconds
-      cl.SetLimits(0, 20)#offset, limit, maxmatches=0, cutoff=0
-      # Process query under index
-      res = cl.Query ( query, index )
-      repeat = 0
-    except socket.timeout:
-      repeat -= 1
-  if request.args.get('debug'):
-    ret['deb'] = {'host': host, 'port': port, 'index': index, 'query': query}
-  if not res:
-    ret['error'] = cl.GetLastError()
-    return False, None
-  #return False,None
+    repeat = 3
+    # Repeate 3 times request because of socket.timeout
+    while repeat > 0:
+        try:
+            cl = SphinxClient()
+            cl.SetServer (host, port)
+            cl.SetConnectTimeout(0.5) # float seconds
+            cl.SetLimits(0, 20)#offset, limit, maxmatches=0, cutoff=0
+            # Process query under index
+            res = cl.Query ( query, index )
+            repeat = 0
+        except socket.timeout:
+            repeat -= 1
+    if request.args.get('debug'):
+        ret['deb'] = {'host': host, 'port': port, 'index': index, 'query': query}
+    if not res:
+        ret['error'] = cl.GetLastError()
+        return False, None
+    #return False,None
 
-  result = []
-  if res.has_key('matches'):
-    ret['matches_type'] = str(type(res['matches']))
-    # Format results
-    for row in res['matches']:
-      r = row['attrs']
-      rr = {}
-      r['id'] = r['osm_id']
-      # del r['sid']
-      # if 'bbox' in r:
-      #   bbox = r['bbox'].split(',')
-      #   bbox = [float(v) for v in bbox]
-      #   r['bbox'] = bbox
-      if 'sindex' in r:
-        del r['sindex']
-      # Fixing values and types
-      for attr in r:
-        if r[attr] == 'None' or r[attr] is None:
-          continue
-        if isinstance(r[attr], str):
-          r[attr] = r[attr].decode('utf-8')
-        if attr in ('ort', 'bls', 'knr'):
-          rr[ attr.upper() ] = r[ attr ]
-        else:
-          rr[ attr ] = r[attr]
-      # Make bbox from north, south, east, west attributes
-      rr['bbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
-      # Make latlon from lat, lon
-      rr['latlon'] = "{}, {}".format(r['lat'], r['lon'])
-      result.append(rr)
-  ret['result'] = result
-    # ret['result'] = res['matches']
-  # if res.has_key('words'):
-    # ret['words'] = res['words']
-  return True, result
+    result = []
+    if res.has_key('matches'):
+        ret['matches_type'] = str(type(res['matches']))
+        # Format results
+        for row in res['matches']:
+            r = row['attrs']
+            rr = {}
+            r['id'] = r['osm_id']
+            # del r['sid']
+            # if 'bbox' in r:
+            #   bbox = r['bbox'].split(',')
+            #   bbox = [float(v) for v in bbox]
+            #   r['bbox'] = bbox
+            if 'sindex' in r:
+                del r['sindex']
+            # Fixing values and types
+            for attr in r:
+                if r[attr] == 'None' or r[attr] is None:
+                    continue
+                if isinstance(r[attr], str):
+                    r[attr] = r[attr].decode('utf-8')
+                if attr in ('ort', 'bls', 'knr'):
+                    rr[ attr.upper() ] = r[ attr ]
+                else:
+                    rr[ attr ] = r[attr]
+            # Make bbox from north, south, east, west attributes
+            rr['bbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
+            # Make latlon from lat, lon
+            rr['latlon'] = "{}, {}".format(r['lat'], r['lon'])
+            result.append(rr)
+    ret['result'] = result
+        # ret['result'] = res['matches']
+    # if res.has_key('words'):
+        # ret['words'] = res['words']
+    return True, result
 
 """
 Format response output
 """
-def formatResponse(rc, result, query):
-  # Format json - return empty
-  if not rc and request.args.get('format') == 'json':
-    result = []
+def formatResponse(rc, data):
+    # Format json - return empty
+    result = data['result']
+    format = request.args.get('format')
+    if 'format' in data:
+        format = data['format']
+    if not rc and format == 'json':
+        result = []
 
-  if request.args.get('format') == 'html':
-    return render_template('answer.html', results = result, query=query)
-    # return Response('<pre>' + pformat( result ) + '</pre>', mimetype='text/html')
+    if format == 'html':
+        tpl = data['template'] if 'template' in data else 'answer.html'
+        return render_template(tpl, rc=rc, **data)
 
-  json = dumps( result )
-  mime = 'application/json'
-  # Append callback for JavaScript
-  if request.args.get('json_callback'):
-    json = request.args.get('json_callback') + "("+json+");";
-    mime = 'application/javascript'
-  return Response(json, mimetype=mime)
+    json = dumps( result )
+    mime = 'application/json'
+    # Append callback for JavaScript
+    if request.args.get('json_callback'):
+        json = request.args.get('json_callback') + "("+json+");";
+        mime = 'application/javascript'
+    return Response(json, mimetype=mime)
 
 
 """
@@ -151,25 +161,88 @@ Searching for display name
 """
 @app.route('/displayName')
 def displayName():
-  ret = {}
-  rc = False
-  index = 'display_name_index'
-  q = request.args.get('q')
-  #if re
-  rc, result = process_query(ret, index, q)
-  if rc and not request.args.get('debug'):
-    ret = result
-  return formatResponse(rc, ret, q)
+    ret = {}
+    rc = False
+    index = 'ind_display_name'
+    q = request.args.get('q')
+    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'answer.html'}
+    rc, result = process_query(ret, index, q)
+    if rc and not request.args.get('debug'):
+        ret = result
+    data['result'] = ret
+    return formatResponse(rc, data)
+
+
+"""
+Global searching
+"""
+@app.route('/search')
+def search():
+    ret = {}
+    rc = False
+    index = 'search_index'
+    q = request.args.get('q')
+    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'answer.html'}
+    rc, result = process_query(ret, index, q)
+    if rc and not request.args.get('debug'):
+        ret = result
+    data['result'] = ret
+    return formatResponse(rc, data)
+
+
+"""
+Custom search
+"""
+@app.route('/custom')
+def custom():
+    q = request.args.get('q')
+    index = str(request.args.get('index'))
+    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'custom.html'}
+    data['indices'] = ['display_name_index', 'name_index', 'class_index', 'type_index',
+        'latlon_index', 'osmid_index', 'search_index']
+    if not request.args.get('format'):
+        data['format'] = 'html'
+    if not q or not index:
+        # data['result'] = {'error': 'Missing query and/or index!'}
+        data['result'] = []
+        return formatResponse(False, data)
+
+    rc = False
+    ret = {}
+    rc, result = process_query(ret, index, q)
+    if rc and not request.args.get('debug'):
+        ret = result
+    data['result'] = ret
+    return formatResponse(rc, data)
+
 
 """
 Routing root
 """
 @app.route('/')
 def root():
-  return render_template('home.html')
-  # return "<h1>Hello World!</h1>"
-  # return formatResponse(False, {})
+    return render_template('home.html')
+    # return "<h1>Hello World!</h1>"
+    # return formatResponse(False, {})
 
 
+"""
+Custom template filters
+"""
+@app.template_filter()
+def nl2br(value):
+    if isinstance(value, dict):
+        for key in value:
+            value[key] = nl2br(value[key])
+        return value
+    elif isinstance(value, str):
+        return value.replace('\n', '<br>')
+    else:
+        return value
+
+"""
+Main launcher
+"""
 if __name__ == '__main__':
-    app.run(threaded=False, host='0.0.0.0', port=8000)
+        app.run(threaded=False, host='0.0.0.0', port=8000)
+

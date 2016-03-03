@@ -140,8 +140,8 @@ def formatResponse(rc, result, query):
   json = dumps( result )
   mime = 'application/json'
   # Append callback for JavaScript
-  if request.args.get('callback'):
-    json = request.args.get('callback') + "("+json+");";
+  if request.args.get('json_callback'):
+    json = request.args.get('json_callback') + "("+json+");";
     mime = 'application/javascript'
   return Response(json, mimetype=mime)
 

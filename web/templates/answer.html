@@ -1,0 +1,38 @@
+<html>
+<head>
+  <title>OSM Names full text search by Display name</title>
+</head>
+<body>
+  <h1>OSM Names full text search</h1>
+<form name="display_name" action="/displayName" method="get">
+Search: <input type="text" name="q" value="{{ query }}" /><br/>
+<input type="hidden" name="format" value="html" />
+<input type="submit" value="Search by Display name" />
+</form>
+<hr>
+<table class="entries" width="100%" border="1" style="border-collapse: collapse;">
+  <tr>
+    <th></th>
+    <th>osm_id</th>
+    <th>display_name</th>
+    <th>name</th>
+    <th>class</th>
+    <th>type</th>
+    <th>bounding box</th>
+    <th>lat, lon</th>
+  </tr>
+  {% for row in results %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    {% for col in ('osm_id', 'display_name', 'name', 'class', 'type', 'bbox', 'latlon') %}
+    <td>
+    {% if col in row %}
+      {{ row[col] }}
+    {% endif %}
+    </td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+</body>
+</html>

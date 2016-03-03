@@ -2,7 +2,7 @@
 
 sudo rm -rf tmp
 mkdir -p data/index log tmp
-cp sample.tsv data/
+# cp sample.tsv data/
 
 docker stop osmnames-sphinxsearch
 docker rm osmnames-sphinxsearch

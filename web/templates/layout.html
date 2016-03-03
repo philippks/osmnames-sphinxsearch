@@ -1,0 +1,38 @@
+<html>
+<head>
+  {% block head %}
+  <meta charset="utf-8" />
+  <title>OSM Names Search {% block title %}- home{% endblock %}</title>
+  <meta name="author" content="Klokan Technologies GmbH" />
+  <meta name="description" content="Database of geographic place names from OpenStreetMap for full text search downloadable for free. Website: http://osmnames.org">
+  <link href="//klokantech.github.io/styles/base.css" rel="stylesheet" />
+  <script type="text/javascript" src="//klokantech.github.io/javascript/kt.js"></script>
+  {% endblock %}
+</head>
+<body onload="load();">
+<div class="container main">
+
+  <h1>OSM Names full text search</h1>
+  {% block search_input %}
+<form name="display_name" action="/displayName" method="get">
+Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value="" class="autocomplete-nominatim" /><br/>
+<input type="hidden" name="format" value="html" />
+<input class="btn" type="submit" value="Search by Display name" />
+</form>
+{% endblock %}
+
+<div id="result">
+    {% block result %}{% endblock %}
+</div><!-- #result -->
+
+</div><!-- .container.main -->
+
+<script>
+{% block script %}
+function load() {
+    new kt.Nominatim(document.getElementById('autocomplete'), '/displayName');
+}
+{% endblock %}
+</script>
+</body>
+</html>

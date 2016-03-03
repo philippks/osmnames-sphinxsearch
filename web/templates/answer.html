@@ -1,14 +1,6 @@
-<html>
-<head>
-  <title>OSM Names full text search by Display name</title>
-</head>
-<body>
-  <h1>OSM Names full text search</h1>
-<form name="display_name" action="/displayName" method="get">
-Search: <input type="text" name="q" value="{{ query }}" /><br/>
-<input type="hidden" name="format" value="html" />
-<input type="submit" value="Search by Display name" />
-</form>
+{% extends "layout.html" %}
+{% block title %}- Home{% endblock %}
+{% block result %}
 <hr>
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">
   <tr>
@@ -34,5 +26,4 @@ Search: <input type="text" name="q" value="{{ query }}" /><br/>
   </tr>
   {% endfor %}
 </table>
-</body>
-</html>
+{% endblock %}

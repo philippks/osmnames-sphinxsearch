@@ -26,14 +26,15 @@ RUN curl -s \
 && rm /tmp/sphinxsearch.deb \
 && easy_install -q flask-cache \
 && pip install -q supervisor \
-&& mkdir -p /var/log/sphinx
+&& mkdir -p /var/log/sphinx \
+&& mkdir -p /var/log/supervisord
 
 COPY conf/sphinx/*.conf /etc/sphinx/
 COPY conf/nginx/nginx.conf /etc/nginx/sites-available/default
-COPY supervisor/*.conf /etc/supervisord/conf.d/
+COPY supervisor/*.conf /etc/supervisor/conf.d/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY web /usr/local/src/websearch
-COPY sphinx-reindex.sh /usr/local/bin/
+# COPY sphinx-reindex.sh /usr/local/bin/
 
 ENV SPHINX_PORT 9312
 

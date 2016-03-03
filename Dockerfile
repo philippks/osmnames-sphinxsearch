@@ -34,11 +34,10 @@ COPY conf/nginx/nginx.conf /etc/nginx/sites-available/default
 COPY supervisor/*.conf /etc/supervisor/conf.d/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY web /usr/local/src/websearch
-# COPY sphinx-reindex.sh /usr/local/bin/
+COPY sample.tsv /
+COPY sphinx-reindex.sh /
 
 ENV SPHINX_PORT 9312
-
-# CMD ["/usr/bin/python", "/usr/local/src/websearch/websearch.py"]
 
 EXPOSE 80
 CMD ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

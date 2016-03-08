@@ -1,6 +1,7 @@
 #!/bin/sh -e
 # Copy sample file if missing
 if [ ! -f /data/input/data.tsv ]; then
+    mkdir -p /data/input/
     cp /sample.tsv /data/input/data.tsv
 fi
 
@@ -11,4 +12,6 @@ if [ ! -d /data/index ]; then
 fi
 
 # Start sphinx job in supervisor
-supervisorctl -c /etc/supervisor/supervisord.conf start sphinx
+if [ ! pidof searchd ]; then
+    supervisorctl -c /etc/supervisor/supervisord.conf start sphinx
+fi

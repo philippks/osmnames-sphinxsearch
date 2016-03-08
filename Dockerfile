@@ -20,7 +20,7 @@ RUN apt-get -qq update && apt-get install -qq -y --no-install-recommends \
     uwsgi-plugin-python
 
 RUN curl -s \
-    http://sphinxsearch.com/files/sphinxsearch_2.2.9-release-1~wheezy_amd64.deb \
+    http://sphinxsearch.com/files/sphinxsearch_2.2.10-release-1~jessie_amd64.deb \
     -o /tmp/sphinxsearch.deb \
 && dpkg -i /tmp/sphinxsearch.deb \
 && rm /tmp/sphinxsearch.deb \

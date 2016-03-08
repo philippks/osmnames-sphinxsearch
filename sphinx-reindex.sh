@@ -12,6 +12,6 @@ if [ ! -d /data/index ]; then
 fi
 
 # Start sphinx job in supervisor
-if [ ! pidof searchd ]; then
+if [ -z "`pidof searchd`" ]; then
     supervisorctl -c /etc/supervisor/supervisord.conf start sphinx
 fi

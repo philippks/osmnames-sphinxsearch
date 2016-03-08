@@ -163,7 +163,7 @@ Searching for display name
 def displayName():
     ret = {}
     rc = False
-    index = 'ind_display_name'
+    index = 'ind_name'
     q = request.args.get('q')
     data = {'query': q, 'index': index, 'route': '/custom', 'template': 'answer.html'}
     rc, result = process_query(ret, index, q)
@@ -198,8 +198,8 @@ def custom():
     q = request.args.get('q')
     index = str(request.args.get('index'))
     data = {'query': q, 'index': index, 'route': '/custom', 'template': 'custom.html'}
-    data['indices'] = ['display_name_index', 'name_index', 'class_index', 'type_index',
-        'latlon_index', 'osmid_index', 'search_index']
+    data['indices'] = ['name_index', 'class_index', 'type_index',
+        'search_index']
     if not request.args.get('format'):
         data['format'] = 'html'
     if not q or not index:

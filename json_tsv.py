@@ -17,7 +17,7 @@ columns = {
     "lon": "f:lon",
 }
 
-column_order = ["id", "display_name", "osm_id", "class","type", "north", "south", "east", "west", "lon", "lat"]
+column_order = ["id", "display_name", "class", "type", "lon", "lat", "west", "south", "east", "north"]
 
 # s = []
 # for col in columns:
@@ -48,7 +48,8 @@ for line in fileinput.input():
             value = obj[json_column]
             # pprint(cx)
         if format == 's':
-            s.append( "\"{}\"".format(value) )
+            #s.append( "\"{}\"".format(value) )
+            s.append( "{}".format(value) )
         elif format == 'i':
             s.append( str(int(value)) )
         elif format == 'f':

@@ -96,13 +96,15 @@ def process_query(ret, index, query):
     #return False,None
 
     result = []
+    i = 1
     if res.has_key('matches'):
         ret['matches_type'] = str(type(res['matches']))
         # Format results
         for row in res['matches']:
             r = row['attrs']
             rr = {}
-            r['id'] = r['osm_id']
+            r['osm_id'] = r['id'] = i
+            i += 1
             # del r['sid']
             # if 'bbox' in r:
             #   bbox = r['bbox'].split(',')
@@ -124,6 +126,8 @@ def process_query(ret, index, query):
             rr['bbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
             # Make latlon from lat, lon
             rr['latlon'] = "{}, {}".format(r['lat'], r['lon'])
+            # 
+            rr['country_code'] = "CZ"
             result.append(rr)
     ret['result'] = result
         # ret['result'] = res['matches']

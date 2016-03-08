@@ -7,8 +7,6 @@
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">
   <tr>
     <th></th>
-    <th>osm_id</th>
-    <th>display_name</th>
     <th>name</th>
     <th>class</th>
     <th>type</th>
@@ -18,7 +16,7 @@
   {% for row in result %}
   <tr>
     <td>{{ loop.index }}</td>
-    {% for col in ('osm_id', 'display_name', 'name', 'class', 'type', 'bbox', 'latlon') %}
+    {% for col in ('name', 'class', 'type', 'bbox', 'latlon') %}
     <td>
     {% if col in row %}
       {{ row[col] }}

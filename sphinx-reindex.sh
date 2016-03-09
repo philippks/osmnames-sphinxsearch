@@ -6,7 +6,7 @@ if [ ! -f /data/input/data.tsv ]; then
 fi
 
 # Index files, only if not exists
-if [ ! -d /data/index ]; then
+if [ ! -f /data/index/ind_name.spa ]; then
     mkdir -p /data/index/
     /usr/bin/indexer -c /etc/sphinx/sphinx.conf --rotate --all
 fi

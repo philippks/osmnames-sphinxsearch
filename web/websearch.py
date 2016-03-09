@@ -126,19 +126,22 @@ def process_query(ret, index, query):
             rr['bbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
             # Make latlon from lat, lon
             rr['latlon'] = "{}, {}".format(r['lat'], r['lon'])
+            if 'name' in rr:
+                rr['display_name'] = rr['name']
+            if 'display_name' in rr:
+                rr['name'] = rr['display_name']
             # Empty values for KlokanTech NominatimMatcher JS
             rr['address'] = {
-                'country_code': 'cz',
-                'country': 'czech',
-                'city': 'brno',
-                'town': 'brno',
-                'village': 'brno',
-                'hamlet': '',
-                'suburb': 'brno',
+                'country_code': '',
+                'country': '',
+                'city': None,
+                'town': None,
+                'village': None,
+                'hamlet': rr['name'],
+                'suburb': '',
                 'pedestrian': '',
                 'house_number': '1'
             }
-            rr['display_name'] = rr['name']
             result.append(rr)
     ret['result'] = result
         # ret['result'] = res['matches']

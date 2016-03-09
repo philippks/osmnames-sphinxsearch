@@ -1,10 +1,11 @@
-7444		place	city	2.3521334	48.8565056	2.46976041794	48.9021568298	2.22412180901	48.815574646
-71525	Paris, Ile-de-France, Metropolitan France, France	boundary	administrative	2.32003761177	48.85886575	2.46976041794	48.9021568298	2.22412180901	48.815574646
-33063046	Paris, Logan County, Arkansas, United States of America	place	city	-93.7299173	35.2920325	-93.6750793457	35.3065032959	-93.7618103027	35.2672462463
-33299478	Paris, Lamar County, Texas, United States of America	place	city	-95.555513	33.6617962	-95.4354476929	33.7383804321	-95.6279296875	33.6118507385
-130722	Paris, Bourbon County, Kentucky, United States of America	place	city	-84.2529869	38.2097987	-84.2320861816	38.2382736206	-84.3073272705	38.1649208069
-1688891876	Paris, South Las Vegas Boulevard, Hughes Center, Paradise, Clark County, Nevada, 89109, United States of America	highway	bus_stop	-115.1726609	36.1120019	-115.172660828	36.1120033264	-115.172668457	36.1119995117
-257763716	Paris, Ontario, Canada	place	town	-80.3842807	43.1932336	-80.3842773438	43.1932373047	-80.3842849731	43.19323349
-140787	Paris, Monroe County, Missouri, United States of America	place	city	-92.0012811	39.4808721	-91.9916763306	39.4892807007	-92.021484375	39.4691543579
-126166	Paris, Edgar County, Illinois, United States of America	place	city	-87.6961374	39.611146	-87.6505355835	39.6485786438	-87.7210464478	39.5814208984
-197171	Paris, Henry County, Tennessee, United States of America	place	city	-88.3267107	36.3020023	-88.2650604248	36.3290176392	-88.3671188354	36.266002655
+display_name	class	type	lon	lat	west	south	east	north
+Paris, Ile-de-France, Metropolitan France, France	place	city	2.3521334	48.8565056	2.46976041794	48.9021568298	2.22412180901	48.815574646
+Paris, Ile-de-France, Metropolitan France, France	boundary	administrative	2.32003761177	48.85886575	2.46976041794	48.9021568298	2.22412180901	48.815574646
+Paris, Logan County, Arkansas, United States of America	place	city	-93.7299173	35.2920325	-93.6750793457	35.3065032959	-93.7618103027	35.2672462463
+Paris, Lamar County, Texas, United States of America	place	city	-95.555513	33.6617962	-95.4354476929	33.7383804321	-95.6279296875	33.6118507385
+Paris, Bourbon County, Kentucky, United States of America	place	city	-84.2529869	38.2097987	-84.2320861816	38.2382736206	-84.3073272705	38.1649208069
+Paris, South Las Vegas Boulevard, Hughes Center, Paradise, Clark County, Nevada, 89109, United States of America	highway	bus_stop	-115.1726609	36.1120019	-115.172660828	36.1120033264	-115.172668457	36.1119995117
+Paris, Ontario, Canada	place	town	-80.3842807	43.1932336	-80.3842773438	43.1932373047	-80.3842849731	43.19323349
+Paris, Monroe County, Missouri, United States of America	place	city	-92.0012811	39.4808721	-91.9916763306	39.4892807007	-92.021484375	39.4691543579
+Paris, Edgar County, Illinois, United States of America	place	city	-87.6961374	39.611146	-87.6505355835	39.6485786438	-87.7210464478	39.5814208984
+Paris, Henry County, Tennessee, United States of America	place	city	-88.3267107	36.3020023	-88.2650604248	36.3290176392	-88.3671188354	36.266002655

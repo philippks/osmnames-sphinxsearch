@@ -17,7 +17,7 @@ columns = {
     "lon": "f:lon",
 }
 
-column_order = ["id", "display_name", "class", "type", "lon", "lat", "west", "south", "east", "north"]
+column_order = ["display_name", "class", "type", "lon", "lat", "west", "south", "east", "north"]
 
 # s = []
 # for col in columns:
@@ -25,6 +25,8 @@ column_order = ["id", "display_name", "class", "type", "lon", "lat", "west", "so
 # pprint(s)
 # print("\t".join(s))
 # print("\"osm_id\"\t\"display_name\"\t\"name\"\t\"class\"\t\"type\"\t\"north\"\t\"south\"\t\"east\"\t\"west\"\t\"lat\"\t\"lon\"")
+
+print("\t".join(column_order))
 
 for line in fileinput.input():
     try:

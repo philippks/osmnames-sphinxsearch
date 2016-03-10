@@ -2,7 +2,7 @@
 {% block title %}- Custom search{% endblock %}
 {% block search_input %}
 <form name="custom" action="/custom" method="get">
-Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value="{{query}}" class="autocomplete-nominatim" onchange="this.form.submit()" /> in <select name="index" onchange="this.form.submit()">
+Search: <input autocomplete="off" id="autocomplete" type="text" name="q" value="{{query}}" class="autocomplete-nominatim" onchange="this.form.submit()" autofocus="autofocus" /> in <select name="index" onchange="this.form.submit()">
 {% for opt in indices %}
   {% set selected=" selected=\"selected\"" if (index == opt) else "" %}
   <option value="{{opt}}"{{selected}}>{{opt}}</option>

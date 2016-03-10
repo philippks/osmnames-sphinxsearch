@@ -15,7 +15,7 @@
   <h1>OSM Names full text search</h1>
 {% block search_input %}
 <form name="display_name" action="{{ route }}" method="get">
-Search: <input autocomplete="off" id="autocomplete" type="text" name="q" value="" class="autocomplete-nominatim" /><br/>
+Search: <input autocomplete="off" id="autocomplete" type="text" name="q" value="{{query}}" class="autocomplete-nominatim" autofocus="autofocus" /><br/>
 <input type="hidden" name="format" value="html" />
 <input class="btn" type="submit" value="Search" />
 </form>

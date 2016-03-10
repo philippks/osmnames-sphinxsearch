@@ -75,8 +75,8 @@ def process_query(ret, index, query):
     # if index in indexPorts:
         # index = indexPorts[index]
 
-    querylist = query.split(" ")
-    query = "|".join(querylist)
+    #querylist = query.split(" ")
+    #query = "|".join(querylist)
 
     repeat = 3
     res = None
@@ -87,6 +87,7 @@ def process_query(ret, index, query):
             cl.SetServer (host, port)
             cl.SetConnectTimeout(2.0) # float seconds
             cl.SetLimits(0, 20)#offset, limit, maxmatches=0, cutoff=0
+            cl.SetMatchMode(SPH_MATCH_ANY)
             # Process query under index
             res = cl.Query ( query, index )
             repeat = 0

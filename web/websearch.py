@@ -79,6 +79,7 @@ def process_query(ret, index, query):
     query = "|".join(querylist)
 
     repeat = 3
+    res = None
     # Repeate 3 times request because of socket.timeout
     while repeat > 0:
         try:

@@ -75,13 +75,16 @@ def process_query(ret, index, query):
     # if index in indexPorts:
         # index = indexPorts[index]
 
+    querylist = query.split(" ")
+    query = "|".join(querylist)
+
     repeat = 3
     # Repeate 3 times request because of socket.timeout
     while repeat > 0:
         try:
             cl = SphinxClient()
             cl.SetServer (host, port)
-            cl.SetConnectTimeout(0.5) # float seconds
+            cl.SetConnectTimeout(2.0) # float seconds
             cl.SetLimits(0, 20)#offset, limit, maxmatches=0, cutoff=0
             # Process query under index
             res = cl.Query ( query, index )
@@ -162,6 +165,8 @@ def formatResponse(rc, data):
         result = []
 
     if format == 'html':
+        if not 'route' in data:
+            data['route'] = '/'
         tpl = data['template'] if 'template' in data else 'answer.html'
         return render_template(tpl, rc=rc, **data)
 
@@ -183,7 +188,7 @@ def displayName():
     rc = False
     index = 'ind_name'
     q = request.args.get('q')
-    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'answer.html'}
+    data = {'query': q, 'index': index, 'route': '/displayName', 'template': 'answer.html'}
     rc, result = process_query(ret, index, q)
     if rc and not request.args.get('debug'):
         ret = result
@@ -194,13 +199,15 @@ def displayName():
 """
 Global searching
 """
-@app.route('/search')
+@app.route('/')
 def search():
     ret = {}
     rc = False
     index = 'search_index'
     q = request.args.get('q')
-    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'answer.html'}
+    if not q:
+        return render_template('home.html', route='/')
+    data = {'query': q, 'index': index, 'route': '/', 'template': 'answer.html'}
     rc, result = process_query(ret, index, q)
     if rc and not request.args.get('debug'):
         ret = result
@@ -234,14 +241,14 @@ def custom():
     return formatResponse(rc, data)
 
 
-"""
-Routing root
-"""
-@app.route('/')
-def root():
-    return render_template('home.html')
-    # return "<h1>Hello World!</h1>"
-    # return formatResponse(False, {})
+# """
+# Routing root
+# """
+# @app.route('/')
+# def root():
+#     return render_template('home.html')
+#     # return "<h1>Hello World!</h1>"
+#     # return formatResponse(False, {})
 
 
 """

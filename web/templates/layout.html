@@ -14,10 +14,10 @@
 
   <h1>OSM Names full text search</h1>
 {% block search_input %}
-<form name="display_name" action="/displayName" method="get">
-Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value="" class="autocomplete-nominatim" /><br/>
+<form name="display_name" action="{{ route }}" method="get">
+Search: <input autocomplete="off" id="autocomplete" type="text" name="q" value="" class="autocomplete-nominatim" /><br/>
 <input type="hidden" name="format" value="html" />
-<input class="btn" type="submit" value="Search by Display name" />
+<input class="btn" type="submit" value="Search" />
 </form>
 {% endblock %}
 
@@ -30,7 +30,7 @@ Search: <input autocomplete="false" id="autocomplete" type="text" name="q" value
 <script>
 {% block script %}
 function load() {
-    new kt.Nominatim(document.getElementById('autocomplete'), '/search');
+    // new kt.Nominatim(document.getElementById('autocomplete'), '/');
 }
 {% endblock %}
 </script>

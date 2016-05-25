@@ -8,7 +8,7 @@ fi
 # Index files, only if not exists
 if [ ! -f /data/index/ind_name.spa ]; then
     mkdir -p /data/index/
-    /usr/bin/indexer -c /etc/sphinx/sphinx.conf --rotate --all
+    /usr/bin/indexer -c /etc/sphinxsearch/sphinx.conf --rotate --all
 fi
 
 # Start sphinx job in supervisor

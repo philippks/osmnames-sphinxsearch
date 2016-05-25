@@ -9,11 +9,9 @@ RUN apt-get -qq update && apt-get install -qq -y --no-install-recommends \
     nginx \
     python \
     python-setuptools \
-    python-shapely \
     python-pip \
     python-crypto \
     python-flask \
-    python-shapely \
     python-pil \
     unixodbc \
     uwsgi \
@@ -29,7 +27,7 @@ RUN curl -s \
 && mkdir -p /var/log/sphinx \
 && mkdir -p /var/log/supervisord
 
-COPY conf/sphinx/*.conf /etc/sphinx/
+COPY conf/sphinx/*.conf /etc/sphinxsearch/
 COPY conf/nginx/nginx.conf /etc/nginx/sites-available/default
 COPY supervisor/*.conf /etc/supervisor/conf.d/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
@@ -37,7 +35,9 @@ COPY web /usr/local/src/websearch
 COPY sample.tsv /
 COPY sphinx-reindex.sh /
 
-ENV SPHINX_PORT 9312
+ENV SPHINX_PORT=9312 \
+    SEARCH_MAX_COUNT=100 \
+    SEARCH_DEFAULT_COUNT=20
 
 EXPOSE 80
 CMD ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

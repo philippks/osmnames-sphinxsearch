@@ -57,10 +57,11 @@ def process_query(index, query, query_filter, start=0, count=0):
             cl.SetServer(host, port)
             cl.SetConnectTimeout(2.0) # float seconds
             cl.SetLimits(start, count) #offset, limit, maxmatches=0, cutoff=0
+            cl.SetRankingMode(SPH_RANK_SPH04)
             # cl.SetMatchMode(SPH_MATCH_EXTENDED2) # default setting
             cl.SetSortMode(SPH_SORT_EXTENDED, '@relevance DESC, importance DESC')
             cl.SetFieldWeights({
-                'name': 50,
+                'name': 500,
                 'display_name': 1,
             })
 
@@ -73,10 +74,10 @@ def process_query(index, query, query_filter, start=0, count=0):
 
             if 'viewbox' in query_filter and query_filter['viewbox'] is not None:
                 bbox = query_filter['viewbox'].split(',')
-                # longtitude, west, east
-                lon = [float(bbox[0]), float(bbox[2])]
                 # latitude, south, north
-                lat = [float(bbox[1]), float(bbox[3])]
+                lat = [float(bbox[0]), float(bbox[2])]
+                # longtitude, west, east
+                lon = [float(bbox[1]), float(bbox[3])]
                 # Filter on lon lat now
                 cl.SetFilterFloatRange('lon', lon[0], lon[1])
                 cl.SetFilterFloatRange('lat', lat[0], lat[1])

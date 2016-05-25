@@ -24,6 +24,9 @@
     <td>
     {% if col in row %}
       {{ row[col] }}
+      {% if col == 'boundingbox' %}
+      <br>{{ row['lon'] }}, {{ row['lat'] }}
+      {% endif %}
     {% endif %}
     </td>
     {% endfor %}

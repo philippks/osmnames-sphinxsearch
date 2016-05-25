@@ -3,20 +3,24 @@
 {% block result %}
 <hr>
 {% if rc %}
-<p>Found <b>{{ result | length }}</b> results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
+<p>Found <b>{{ result['totalResults'] }}</b> results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
+<p>Showing <b>{{ result['results'] | length }}</b> results</p>
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">
   <tr>
     <th></th>
+    <th>id</th>
     <th>name</th>
     <th>class</th>
     <th>type</th>
     <th>bounding box</th>
-    <th>lat, lon</th>
+    <th>display_name</th>
+    <th>rank</th>
+    <th>importance</th>
   </tr>
-  {% for row in result %}
+  {% for row in result['results'] %}
   <tr>
     <td>{{ loop.index }}</td>
-    {% for col in ('name', 'class', 'type', 'bbox', 'latlon') %}
+    {% for col in ('id', 'name', 'class', 'type', 'boundingbox', 'display_name', 'rank', 'importance') %}
     <td>
     {% if col in row %}
       {{ row[col] }}

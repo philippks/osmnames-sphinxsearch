@@ -19,40 +19,22 @@ app = Flask(__name__, template_folder='templates/')
 app.debug = not getenv('WEBSEARCH_DEBUG') is None
 app.debug = True
 
-# Name for Sphinx searchd Link name
-# SPHINX_LINK_NAME = getenv('SPHINX_LINK_NAME')
 
-# # Mapping array
-# # Maps /path from URL into sphinx index (in sphinx.conf)
-# indexPorts = {'sheets': 'maprank_sheets', 'series': 'maprank_series',
-#   'sheets_id': 'maprank_sheets_id', 'series_id': 'maprank_series_id'}
+# Return maximal number of results
+SEARCH_MAX_COUNT = 100
+SEARCH_DEFAULT_COUNT = 20
+if getenv('SEARCH_MAX_COUNT'):
+    SEARCH_MAX_COUNT = int(getenv('SEARCH_MAX_COUNT'))
+if getenv('SEARCH_DEFAULT_COUNT'):
+    SEARCH_DEFAULT_COUNT = int(getenv('SEARCH_DEFAULT_COUNT'))
 
-# # Prepare porting path to sphinx index
-# sheets_from = getenv('SPHINX_MAP_SHEETS_FROM')
-# if sheets_from:
-#   sheets_to = getenv('SPHINX_MAP_SHEETS_TO')
-#   if sheets_to:
-#     indexPorts[sheets_from] = sheets_to
-# series_from = getenv('SPHINX_MAP_SERIES_FROM')
-# if series_from:
-#   series_to = getenv('SPHINX_MAP_SERIES_TO')
-#   if series_to:
-#     indexPorts[series_from] = series_to
-# sheets_id_from = getenv('SPHINX_MAP_SHEETS_ID_FROM')
-# if sheets_id_from:
-#   sheets_id_to = getenv('SPHINX_MAP_SHEETS_TO')
-#   if sheets_id_to:
-#     indexPorts[sheets_id_from] = sheets_id_to
-# series_id_from = getenv('SPHINX_MAP_SERIES_ID_FROM')
-# if series_id_from:
-#   series_id_to = getenv('SPHINX_MAP_SERIES_ID_TO')
-#   if series_id_to:
-#     indexPorts[series_id_from] = series_id_to
 
+
+# ---------------------------------------------------------
 """
 Process query to Sphinx searchd
 """
-def process_query(ret, index, query):
+def process_query(index, query, query_filter, start=0, count=0):
     # default server configuration
     host = 'localhost'
     port = 9312
@@ -61,116 +43,136 @@ def process_query(ret, index, query):
     if getenv('WEBSEARCH_SERVER_PORT'):
         port = int(getenv('WEBSEARCH_SERVER_PORT'))
     pprint([host, port, getenv('WEBSEARCH_SERVER')])
-    # try:
-    #   if SPHINX_LINK_NAME:
-    #     host = getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_ADDR')
-    #     if host:
-    #       port = int(getenv(SPHINX_LINK_NAME + '_PORT_9312_TCP_PORT'))
-    #     else:
-    #       host = 'localhost'
-    # except Exception, e:
-    #   ret['error'] = 'Cannot connect to sphinx: ' + str(e)
-    #   return False, None
 
-    # if index in indexPorts:
-        # index = indexPorts[index]
-
-    #querylist = query.split(" ")
-    #query = "|".join(querylist)
+    if count == 0:
+        count = SEARCH_DEFAULT_COUNT
+    count = min(SEARCH_MAX_COUNT, count)
 
     repeat = 3
-    res = None
+    result = None
     # Repeate 3 times request because of socket.timeout
     while repeat > 0:
         try:
             cl = SphinxClient()
-            cl.SetServer (host, port)
+            cl.SetServer(host, port)
             cl.SetConnectTimeout(2.0) # float seconds
-            cl.SetLimits(0, 20)#offset, limit, maxmatches=0, cutoff=0
-            cl.SetMatchMode(SPH_MATCH_ANY)
+            cl.SetLimits(start, count) #offset, limit, maxmatches=0, cutoff=0
+            # cl.SetMatchMode(SPH_MATCH_EXTENDED2) # default setting
+            cl.SetSortMode(SPH_SORT_EXTENDED, '@relevance DESC, importance DESC')
+            cl.SetFieldWeights({
+                'name': 50,
+                'display_name': 1,
+            })
+
+            # Prepare filter for query, except tags
+            for f in ['class', 'type', 'street', 'city', 'county', 'state',
+                      'country_code', 'country']:
+                if f not in query_filter or query_filter[f] is None:
+                    continue
+                cl.SetFilterString(f, query_filter[f])
+
+            if 'viewbox' in query_filter and query_filter['viewbox'] is not None:
+                bbox = query_filter['viewbox'].split(',')
+                # longtitude, west, east
+                lon = [float(bbox[0]), float(bbox[2])]
+                # latitude, south, north
+                lat = [float(bbox[1]), float(bbox[3])]
+                # Filter on lon lat now
+                cl.SetFilterFloatRange('lon', lon[0], lon[1])
+                cl.SetFilterFloatRange('lat', lat[0], lat[1])
+
             # Process query under index
-            res = cl.Query ( query, index )
+            result = cl.Query ( query, index )
             repeat = 0
+
         except socket.timeout:
             repeat -= 1
-    if request.args.get('debug'):
-        ret['deb'] = {'host': host, 'port': port, 'index': index, 'query': query}
-    if not res:
-        ret['error'] = cl.GetLastError()
-        return False, None
-    #return False,None
 
-    result = []
-    i = 1
-    if res.has_key('matches'):
-        ret['matches_type'] = str(type(res['matches']))
-        # Format results
-        for row in res['matches']:
-            r = row['attrs']
-            rr = {}
-            r['osm_id'] = r['id'] = i
-            i += 1
-            # del r['sid']
-            # if 'bbox' in r:
-            #   bbox = r['bbox'].split(',')
-            #   bbox = [float(v) for v in bbox]
-            #   r['bbox'] = bbox
-            if 'sindex' in r:
-                del r['sindex']
-            # Fixing values and types
-            for attr in r:
-                if r[attr] == 'None' or r[attr] is None:
-                    continue
-                if isinstance(r[attr], str):
-                    r[attr] = r[attr].decode('utf-8')
-                if attr in ('ort', 'bls', 'knr'):
-                    rr[ attr.upper() ] = r[ attr ]
-                else:
-                    rr[ attr ] = r[attr]
-            # Make bbox from north, south, east, west attributes
-            rr['bbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
-            # Make latlon from lat, lon
-            rr['latlon'] = "{}, {}".format(r['lat'], r['lon'])
-            if 'name' in rr:
-                rr['display_name'] = rr['name']
-            if 'display_name' in rr:
-                rr['name'] = rr['display_name']
-            # Empty values for KlokanTech NominatimMatcher JS
-            rr['address'] = {
-                'country_code': '',
-                'country': '',
-                'city': None,
-                'town': None,
-                'village': None,
-                'hamlet': rr['name'],
-                'suburb': '',
-                'pedestrian': '',
-                'house_number': '1'
-            }
-            result.append(rr)
-    ret['result'] = result
-        # ret['result'] = res['matches']
-    # if res.has_key('words'):
-        # ret['words'] = res['words']
-    return True, result
+    status = True
+    if not result:
+        result = {
+            'message': cl.GetLastError(),
+            'total_found': 0,
+            'matches': [],
+        }
+        status = False
 
+    result['count'] = count
+    result['startIndex'] = start
+    result['status'] = status
+
+    return status, prepareResultJson(result, query_filter)
+
+
+# ---------------------------------------------------------
+def prepareResultJson(result, query_filter):
+    from pprint import pprint
+
+    response = {
+        'results': [],
+        'startIndex': result['startIndex'],
+        'count': result['count'],
+        'totalResults': result['total_found'],
+    }
+
+    for row in result['matches']:
+        r = row['attrs']
+        res = {'rank': row['weight'], 'id': row['id']}
+        for attr in r:
+            if isinstance(r[attr], str):
+                res[attr] = r[attr].decode('utf-8')
+            else:
+                res[ attr ] = r[attr]
+        # res['boundingbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
+        res['boundingbox'] = [res['west'], res['south'], res['east'], res['north']]
+        del res['west']
+        del res['south']
+        del res['east']
+        del res['north']
+        # Empty values for KlokanTech NominatimMatcher JS
+        # res['address'] = {
+        #     'country_code': '',
+        #     'country': '',
+        #     'city': None,
+        #     'town': None,
+        #     'village': None,
+        #     'hamlet': rr['name'],
+        #     'suburb': '',
+        #     'pedestrian': '',
+        #     'house_number': '1'
+        # }
+        response['results'].append(res)
+
+    # Prepare next and previous index
+    nextIndex = result['startIndex'] + result['count']
+    if nextIndex <= result['total_found']:
+        response['nextIndex'] = nextIndex
+    prevIndex = result['startIndex'] - result['count']
+    if prevIndex >= 0:
+        response['previousIndex'] = prevIndex
+
+    return response
+
+
+
+# ---------------------------------------------------------
 """
 Format response output
 """
-def formatResponse(rc, data):
+def formatResponse(data, code=200):
     # Format json - return empty
-    result = data['result']
-    format = request.args.get('format')
+    result = data['result'] if 'result' in data else {}
+    format = 'json'
+    if request.args.get('format'):
+        format = request.args.get('format')
     if 'format' in data:
         format = data['format']
-    if not rc and format == 'json':
-        result = []
 
-    if format == 'html':
+    tpl = data['template'] if 'template' in data else 'answer.html'
+    if format == 'html' and tpl is not None:
         if not 'route' in data:
             data['route'] = '/'
-        tpl = data['template'] if 'template' in data else 'answer.html'
-        return render_template(tpl, rc=rc, **data)
+        return render_template(tpl, rc=(code == 200), **data), code
 
     json = dumps( result )
     mime = 'application/json'
@@ -178,81 +180,94 @@ def formatResponse(rc, data):
     if request.args.get('json_callback'):
         json = request.args.get('json_callback') + "("+json+");";
         mime = 'application/javascript'
-    return Response(json, mimetype=mime)
+    if request.args.get('callback'):
+        json = request.args.get('callback') + "("+json+");";
+        mime = 'application/javascript'
+    return Response(json, mimetype=mime), code
 
 
+
+# ---------------------------------------------------------
 """
 Searching for display name
 """
 @app.route('/displayName')
 def displayName():
     ret = {}
-    rc = False
+    code = 400
     index = 'ind_name'
     q = request.args.get('q')
+    if not q.startswith('@'):
+        q = '@display_name ' + q
     data = {'query': q, 'index': index, 'route': '/displayName', 'template': 'answer.html'}
-    rc, result = process_query(ret, index, q)
-    if rc and not request.args.get('debug'):
-        ret = result
-    data['result'] = ret
-    return formatResponse(rc, data)
+    rc, result = process_query(index, q)
+    if rc:
+        code = 200
+    data['result'] = result
+    return formatResponse(data, code)
 
 
+
+# ---------------------------------------------------------
 """
 Global searching
 """
-@app.route('/')
+@app.route('/search')
 def search():
-    ret = {}
-    rc = False
+    data = {'query': '', 'route': '/search', 'template': 'answer.html'}
+    code = 400
+
     index = 'search_index'
     q = request.args.get('q')
-    if not q:
-        return render_template('home.html', route='/')
-    data = {'query': q, 'index': index, 'route': '/', 'template': 'answer.html'}
-    rc, result = process_query(ret, index, q)
-    if rc and not request.args.get('debug'):
-        ret = result
-    data['result'] = ret
-    return formatResponse(rc, data)
+
+    query_filter = {
+        'type': None, 'class': None,
+        'street': None, 'city' : None,
+        'county': None, 'state': None,
+        'country_code': None, 'viewbox': None,
+    }
+    filter = False
+    for f in query_filter:
+        if request.args.get(f):
+            v = request.args.get(f)
+            query_filter[f] = v.encode('utf-8')
+            filter = True
+
+    if not q and not filter:
+        data['result'] = {'error': 'Missing query!'}
+        return formatResponse(data, 404)
+
+    data['query'] = q.encode('utf-8')
+
+    start = 0
+    count = 0
+    if request.args.get('startIndex'):
+        start = int(request.args.get('startIndex'))
+    if request.args.get('count'):
+        count = int(request.args.get('count'))
+
+    data['url'] = request.url
+
+    rc, result = process_query(index, data['query'], query_filter, start, count)
+    if rc:
+        code = 200
+
+    data['result'] = result
+
+    return formatResponse(data, code)
 
 
+# ---------------------------------------------------------
 """
-Custom search
+Homepage (content only for debug)
 """
-@app.route('/custom')
-def custom():
-    q = request.args.get('q')
-    index = str(request.args.get('index'))
-    data = {'query': q, 'index': index, 'route': '/custom', 'template': 'custom.html'}
-    data['indices'] = ['name_index', 'class_index', 'type_index',
-        'search_index']
-    if not request.args.get('format'):
-        data['format'] = 'html'
-    if not q or not index:
-        # data['result'] = {'error': 'Missing query and/or index!'}
-        data['result'] = []
-        return formatResponse(False, data)
-
-    rc = False
-    ret = {}
-    rc, result = process_query(ret, index, q)
-    if rc and not request.args.get('debug'):
-        ret = result
-    data['result'] = ret
-    return formatResponse(rc, data)
+@app.route('/')
+def home():
+    return render_template('home.html', route='/search')
 
 
-# """
-# Routing root
-# """
-# @app.route('/')
-# def root():
-#     return render_template('home.html')
-#     # return "<h1>Hello World!</h1>"
-#     # return formatResponse(False, {})
 
-
+# ---------------------------------------------------------
 """
 Custom template filters
 """

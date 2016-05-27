@@ -84,6 +84,8 @@ def process_query(index, query, query_filter, start=0, count=0):
                 cl.SetFilterFloatRange('lon', lon[0], lon[1])
                 cl.SetFilterFloatRange('lat', lat[0], lat[1])
 
+            pprint(query)
+
             # Process query under index
             result = cl.Query ( query, index )
             repeat = 0
@@ -252,6 +254,13 @@ def search():
     data['url'] = request.url
 
     rc, result = process_query(index, data['query'], query_filter, start, count)
+
+    if rc and len(result['results']) == 0: # and not data['query'].startswith('@')
+        pattern = re.compile("\s*,\s*|\s+")
+        query = pattern.split(data['query'])
+        query2 = ' | '.join(query)
+        rc, result = process_query(index, query2, query_filter, start, count)
+
     if rc:
         code = 200
 

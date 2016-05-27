@@ -57,7 +57,9 @@ def process_query(index, query, query_filter, start=0, count=0):
             cl.SetServer(host, port)
             cl.SetConnectTimeout(2.0) # float seconds
             cl.SetLimits(start, count) #offset, limit, maxmatches=0, cutoff=0
-            cl.SetRankingMode(SPH_RANK_SPH04)
+            # cl.SetRankingMode(SPH_RANK_SPH04)
+            # Ranker - SPH04 with boosted exact hit
+            cl.SetRankingMode(SPH_RANK_EXPR, '(sum((4*lcs+2*(min_hit_pos==1)+100*exact_hit)*user_weight)*100+bm25)*importance')
             # cl.SetMatchMode(SPH_MATCH_EXTENDED2) # default setting
             cl.SetSortMode(SPH_SORT_EXTENDED, '@relevance DESC, importance DESC')
             cl.SetFieldWeights({

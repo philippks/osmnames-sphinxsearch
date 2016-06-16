@@ -255,6 +255,7 @@ def search():
 
     rc, result = process_query(index, data['query'], query_filter, start, count)
 
+    data['query'] = data['query'].decode('utf-8')
     if rc and len(result['results']) == 0: # and not data['query'].startswith('@')
         pattern = re.compile("\s*,\s*|\s+")
         query = pattern.split(data['query'])

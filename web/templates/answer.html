@@ -7,21 +7,33 @@
 <p>Showing <b>{{ result['results'] | length }}</b> results</p>
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">
   <tr>
-    <th></th>
+    <th rowspan="2"></th>
     <th>id</th>
     <th>name</th>
     <th>class</th>
     <th>type</th>
-    <th>bounding box</th>
+    <th>bounding box<br>lon, lat</th>
     <th>display_name</th>
     <th>rank</th>
     <th>importance</th>
   </tr>
-  {% for row in result['results'] %}
   <tr>
-    <td>{{ loop.index }}</td>
-    {% for col in ('id', 'name', 'class', 'type', 'boundingbox', 'display_name', 'rank', 'importance') %}
-    <td>
+    <th colspan="6">wikipedia</th>
+    <th colspan="2">place_rank</th>
+  </tr>
+  {% for row in result['results'] %}
+  {% set class = "" %}
+  {% if (loop.index %2) == 0 %}
+  {% set classx = "even" %}
+  {% endif %}
+  <tr class="{{ class }}">
+    <td rowspan="2">{{ loop.index }}</td>
+    {% for col in ('id', 'name', 'class', 'type', 'boundingbox', 'display_name', 'rank', 'importance', 'wikipedia', 'place_rank') %}
+    {% if col == 'wikipedia' %}
+    </tr>
+    <tr class="{{ class }}">
+    {% endif %}
+    <td {% if col == 'wikipedia' %}colspan="6"{% elif col == 'place_rank' %}colspan="2"{% endif %}>
     {% if col in row %}
       {{ row[col] }}
       {% if col == 'boundingbox' %}

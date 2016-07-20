@@ -14,6 +14,7 @@ from sphinxapi import *
 from pprint import pprint, pformat
 from json import dumps
 from os import getenv
+from time import time
 import requests
 import sys
 import MySQLdb
@@ -366,6 +367,10 @@ def search():
 
     q = request.args.get('q')
 
+    times = {}
+    if request.args.get('debug'):
+        times['start'] = time()
+
     query_filter = {
         'type': None, 'class': None,
         'street': None, 'city' : None,
@@ -411,6 +416,9 @@ def search():
     orig_query = data['query']
     index = None
 
+    if request.args.get('debug'):
+        times['prepare'] = time() - times['start']
+
     for ind in ['ind_name', 'ind_name_soundex',]:
         query = orig_query
         index = ind
@@ -427,6 +435,9 @@ def search():
     data['query'] = orig_query.decode('utf-8')
     result['query_succeed'] = query.decode('utf-8')
     result['index_succeed'] = index.decode('utf-8')
+    if request.args.get('debug'):
+        times['process'] = time() - times['start']
+        result['times'] = times
     data['result'] = result
 
     return formatResponse(data, code)

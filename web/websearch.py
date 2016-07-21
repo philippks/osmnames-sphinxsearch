@@ -204,7 +204,8 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     #  - 'max_query_time' - integer (max search time threshold, msec)
     #  - 'retry_count' - integer (distributed retries count)
     #  - 'retry_delay' - integer (distributed retry delay, msec)
-    option = "field_weights = (name = 100, display_name = 1), retry_count = 2, retry_delay = 500"
+    option = "field_weights = (name = 100, display_name = 1)"
+    option += ", retry_count = 2, retry_delay = 500, cutoff = 100, max_matches = 200, max_query_time = 10000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+5*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
     sql = "SELECT WEIGHT()*importance+IF(name=%s,1000000,0) as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
         index,

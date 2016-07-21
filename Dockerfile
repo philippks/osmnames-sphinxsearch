@@ -28,6 +28,8 @@ RUN curl -s \
 && mkdir -p /var/log/sphinx \
 && mkdir -p /var/log/supervisord
 
+VOLUME ["/data/"]
+
 COPY conf/sphinx/*.conf /etc/sphinxsearch/
 COPY conf/nginx/nginx.conf /etc/nginx/sites-available/default
 COPY supervisor/*.conf /etc/supervisor/conf.d/

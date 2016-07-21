@@ -337,13 +337,20 @@ def formatResponse(data, code=200):
 
 # ---------------------------------------------------------
 """
-Modify original query - remove house number
+Modify query - add asterisk for each element of query, set original query
+"""
+def modify_query_autocomplete(orig_query):
+    query = '* '.join(re.compile("\s*,\s*|\s+").split(orig_query))
+    return query, orig_query
+
+"""
+Modify query - use and set original
 """
 def modify_query_orig(orig_query):
     return orig_query, orig_query
 
 """
-Modify original query - remove house number
+Modify query - remove house number, use and set modified query
 """
 def modify_query_remhouse(orig_query):
     # Remove any number from the request
@@ -353,7 +360,7 @@ def modify_query_remhouse(orig_query):
     return query, query
 
 """
-Modify original query - remove house number
+Modify query - split query elements as OR, use modified and set original query
 """
 def modify_query_splitor(orig_query):
     if orig_query.startswith('@'):
@@ -419,24 +426,34 @@ def search():
 
     data['url'] = request.url
 
-    proc_query = orig_query = data['query']
+    orig_query = data['query']
     index = None
 
     if request.args.get('debug'):
         times['prepare'] = time() - times['start']
 
+    modifiers = []
+    if (request.args.get('autocomplete'))
+        modifiers.append(modify_query_autocomplete)
+    modifiers += [modify_query_orig, modify_query_remhouse, modify_query_splitor]
+
     rc = False
     result = {}
     for ind in ['ind_name', 'ind_name_soundex',]:
+        proc_query = orig_query
         index = ind
         # Cycle through few modifications of query
-        for modify in [modify_query_orig, modify_query_remhouse, modify_query_splitor]:
+        for modify in modifiers:
             query, proc_query = modify(proc_query)
             # No modification
             if query is None:
                 continue
             # Process modified query
+            if request.args.get('debug'):
+                times['start_query'] = time()
             rc, result = process_query_mysql(index, query, query_filter, start, count)
+            if request.args.get('debug'):
+                times['{}_{}'.format(ind, modify.__name__)] = time() - times['start_query']
             if rc and len(result['results']) > 0:
                 result['modify'] = modify.__name__
                 result['query_succeed'] = query.decode('utf-8')

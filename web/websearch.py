@@ -198,7 +198,13 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     # ranker=expr('sum((4*lcs+2*(min_hit_pos==1)+exact_hit)*user_weight)*1000+bm25') == SPH_RANK_SPH04
     # ranker=expr('sum((4*lcs+2*(min_hit_pos==1)+100*exact_hit)*user_weight)*1000+bm25') == SPH_RANK_SPH04 boosted with exact_hit
     # select @weight+IF(fieldcrc==$querycrc,10000,0) AS weight
-    option = "field_weights = (name = 100, display_name = 1), retry_count = 3, retry_delay = 900"
+    # options:
+    #  - 'cutoff' - integer (max found matches threshold)
+    #  - 'max_matches' - integer (per-query max matches value), default 1000
+    #  - 'max_query_time' - integer (max search time threshold, msec)
+    #  - 'retry_count' - integer (distributed retries count)
+    #  - 'retry_delay' - integer (distributed retry delay, msec)
+    option = "field_weights = (name = 100, display_name = 1), retry_count = 2, retry_delay = 500"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+5*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
     sql = "SELECT WEIGHT()*importance+IF(name=%s,1000000,0) as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
         index,

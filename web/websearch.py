@@ -18,6 +18,7 @@ from time import time
 import requests
 import sys
 import MySQLdb
+import re
 
 app = Flask(__name__, template_folder='templates/')
 app.debug = not getenv('WEBSEARCH_DEBUG') is None
@@ -334,26 +335,31 @@ def formatResponse(data, code=200):
     return Response(json, mimetype=mime), code
 
 
-
 # ---------------------------------------------------------
 """
-Searching for display name
+Modify original query - remove house number
 """
-@app.route('/displayName')
-def displayName():
-    ret = {}
-    code = 400
-    index = 'ind_name'
-    q = request.args.get('q')
-    if not q.startswith('@'):
-        q = '@display_name ' + q
-    data = {'query': q, 'index': index, 'route': '/displayName', 'template': 'answer.html'}
-    rc, result = process_query(index, q)
-    if rc:
-        code = 200
-    data['result'] = result
-    return formatResponse(data, code)
+def modify_query_orig(orig_query):
+    return orig_query, orig_query
 
+"""
+Modify original query - remove house number
+"""
+def modify_query_remhouse(orig_query):
+    # Remove any number from the request
+    query = re.sub(r"\d+([/, ]\d+)?", "", orig_query)
+    if query == orig_query:
+        return None, orig_query
+    return query, query
+
+"""
+Modify original query - remove house number
+"""
+def modify_query_splitor(orig_query):
+    if orig_query.startswith('@'):
+        return None, orig_query
+    query = ' | '.join(re.compile("\s*,\s*|\s+").split(orig_query))
+    return query, orig_query
 
 
 # ---------------------------------------------------------
@@ -413,28 +419,36 @@ def search():
 
     data['url'] = request.url
 
-    orig_query = data['query']
+    proc_query = orig_query = data['query']
     index = None
 
     if request.args.get('debug'):
         times['prepare'] = time() - times['start']
 
+    rc = False
+    result = {}
     for ind in ['ind_name', 'ind_name_soundex',]:
-        query = orig_query
         index = ind
-        rc, result = process_query_mysql(index, query, query_filter, start, count)
-        if rc and len(result['results']) > 0:
-            break
-        if not query.startswith('@'):
-            query = ' | '.join(re.compile("\s*,\s*|\s+").split(query))
+        # Cycle through few modifications of query
+        for modify in [modify_query_orig, modify_query_remhouse, modify_query_splitor]:
+            query, proc_query = modify(proc_query)
+            # No modification
+            if query is None:
+                continue
+            # Process modified query
             rc, result = process_query_mysql(index, query, query_filter, start, count)
+            if rc and len(result['results']) > 0:
+                result['modify'] = modify.__name__
+                result['query_succeed'] = query.decode('utf-8')
+                result['index_succeed'] = index.decode('utf-8')
+                break
+        if rc and 'results' in result and len(result['results']) > 0:
+            break
 
     if rc:
         code = 200
 
     data['query'] = orig_query.decode('utf-8')
-    result['query_succeed'] = query.decode('utf-8')
-    result['index_succeed'] = index.decode('utf-8')
     if request.args.get('debug'):
         times['process'] = time() - times['start']
         result['times'] = times

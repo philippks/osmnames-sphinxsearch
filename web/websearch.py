@@ -340,7 +340,8 @@ def formatResponse(data, code=200):
 Modify query - add asterisk for each element of query, set original query
 """
 def modify_query_autocomplete(orig_query):
-    query = '* '.join(re.compile("\s*,\s*|\s+").split(orig_query))
+    query = '* '.join(re.compile("\s*,\s*|\s+").split(orig_query)) + '*'
+    query = re.sub(r"\*+", "*", query)
     return query, orig_query
 
 """
@@ -366,6 +367,8 @@ def modify_query_splitor(orig_query):
     if orig_query.startswith('@'):
         return None, orig_query
     query = ' | '.join(re.compile("\s*,\s*|\s+").split(orig_query))
+    if query == orig_query:
+        return None, orig_query
     return query, orig_query
 
 
@@ -379,9 +382,12 @@ def search():
     code = 400
 
     q = request.args.get('q')
+    autocomplete = request.args.get('autocomplete')
+    debug = request.args.get('debug')
+    pprint([q, autocomplete, debug])
 
     times = {}
-    if request.args.get('debug'):
+    if debug:
         times['start'] = time()
 
     query_filter = {
@@ -429,19 +435,25 @@ def search():
     orig_query = data['query']
     index = None
 
-    if request.args.get('debug'):
+    if debug:
         times['prepare'] = time() - times['start']
 
     modifiers = []
-    if (request.args.get('autocomplete')):
+    if autocomplete:
         modifiers.append(modify_query_autocomplete)
-    modifiers += [modify_query_orig, modify_query_remhouse, modify_query_splitor]
+    modifiers.append(modify_query_orig)
+    modifiers.append(modify_query_remhouse)
+    modifiers.append(modify_query_splitor)
+    if debug:
+        pprint(modifiers)
 
     rc = False
     result = {}
     for ind in ['ind_name', 'ind_name_soundex',]:
         proc_query = orig_query
         index = ind
+        if debug:
+            times[ind] = {}
         # Cycle through few modifications of query
         for modify in modifiers:
             query, proc_query = modify(proc_query)
@@ -449,11 +461,11 @@ def search():
             if query is None:
                 continue
             # Process modified query
-            if request.args.get('debug'):
+            if debug:
                 times['start_query'] = time()
             rc, result = process_query_mysql(index, query, query_filter, start, count)
-            if request.args.get('debug'):
-                times['{}_{}'.format(ind, modify.__name__)] = time() - times['start_query']
+            if debug:
+                times[ind][modify.__name__] = time() - times['start_query']
             if rc and len(result['results']) > 0:
                 result['modify'] = modify.__name__
                 result['query_succeed'] = query.decode('utf-8')
@@ -466,11 +478,12 @@ def search():
         code = 200
 
     data['query'] = orig_query.decode('utf-8')
-    if request.args.get('debug'):
+    if debug:
         times['process'] = time() - times['start']
         result['times'] = times
     data['result'] = result
-
+    data['autocomplete'] = autocomplete
+    data['debug'] = debug
     return formatResponse(data, code)
 
 
@@ -498,6 +511,13 @@ def nl2br(value):
         return value.replace('\n', '<br>')
     else:
         return value
+
+"""
+Custom template filters
+"""
+@app.template_filter()
+def ppretty(value):
+    return pformat(value)
 
 """
 Main launcher

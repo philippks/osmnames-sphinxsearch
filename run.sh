@@ -3,7 +3,7 @@
 # cp sample.tsv data/
 
 SOURCE_DIR=/data/osmnames-sphinxsearch
-mkdir -p $SOURCE_DIR/data $SOURCE_DIR/tmp
+mkdir -p $SOURCE_DIR/data $SOURCE_DIR/tmp $SOURCE_DIR/log
 sudo rm -rf $SOURCE_DIR/tmp
 
 docker stop osmnames-sphinxsearch
@@ -14,4 +14,5 @@ docker run -d --name osmnames-sphinxsearch \
     -v `pwd`/web/:/usr/local/src/websearch/ \
     -v $SOURCE_DIR/data/:/data/ \
     -v $SOURCE_DIR/tmp/:/tmp/ \
+    -v $SOURCE_DIR/log/:/var/log/supervisord/ \
     klokantech/osmnames-sphinxsearch:devel

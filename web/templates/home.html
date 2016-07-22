@@ -97,7 +97,11 @@
             } else {
               results.results.forEach(function(item, i) {
                 var isDegenerate = (item.boundingbox[2] - item.boundingbox[0]) * (item.boundingbox[3] - item.boundingbox[1]) <= 0;
-                html += '<div onmouseover="activate(' + i + ')">' + item.display_name + ' <span class="type">[' + item.type + (isDegenerate ? '] [<b>empty</b>' : '') + ']</span></div>';
+                var type = item.type;
+                if (item.class == 'street') {
+                  type = item.class;
+                }
+                html += '<div onmouseover="activate(' + i + ')">' + item.display_name + ' <span class="type">[' + type + (isDegenerate ? '] [<b>empty</b>' : '') + ']</span></div>';
               });
             }
             if (activateTimeoutId) {
@@ -115,14 +119,20 @@
     };
 
     var activate = function(i) {
+      var item = results.results[i];
       if (console && console.log) {
-        console.log('Bounding box: ', results.results[i].boundingbox);
+        console.log('Bounding box: ', item.boundingbox);
       }
-      var extent = ol.extent.applyTransform(results.results[i].boundingbox, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
+
+      var isDegenerate = (item.boundingbox[2] - item.boundingbox[0]) * (item.boundingbox[3] - item.boundingbox[1]) <= 0;
+      var extent = ol.extent.applyTransform(item.boundingbox, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
       map.getView().fit(extent, map.getSize());
+      if (isDegenerate) {
+        map.getView().setZoom(20);
+      }
       var coords = [[extent[0], extent[1]], [extent[0], extent[3]], [extent[2], extent[3]], [extent[2], extent[1]], [extent[0], extent[1]]];
       feature.getGeometry().setCoordinates([coords], 'XY');
-      detailsEl.innerHTML = JSON.stringify(results.results[i], undefined, 2);
+      detailsEl.innerHTML = JSON.stringify(item, undefined, 2);
     };
   </script>
 </head>

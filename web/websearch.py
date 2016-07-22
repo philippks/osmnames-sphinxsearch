@@ -207,7 +207,16 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     option = "field_weights = (name = 100, display_name = 1)"
     option += ", retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 10000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+5*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
-    sql = "SELECT WEIGHT()*importance+IF(name=%s,1000000,0) as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
+    # Prepare query for boost
+    query_elements = re.compile("\s*,\s*|\s+").split(query)
+    select_boost = []
+    argsBoost = []
+    for qe in query_elements:
+        qe = re.sub(r"\**", "", qe)
+        select_boost.append('IF(name=%s,1000000,0)')
+        argsBoost.append(qe)
+    sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
+        '+'.join(select_boost),
         index,
         ' AND '.join(whereFilter),
         ', '.join(sortBy),
@@ -222,7 +231,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     }
 
     try:
-        args = [query] + argsFilter + [start, count]
+        args = argsBoost + argsFilter + [start, count]
         q = cursor.execute(sql, args)
         pprint([sql, args, cursor._last_executed, q])
         desc = cursor.description

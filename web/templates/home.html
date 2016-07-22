@@ -79,8 +79,6 @@
 
         resultsEl.innerHTML = 'Loading...';
         detailsEl.innerHTML = '';
-        map.getView().setCenter([0, 0]);
-        map.getView().setZoom(2);
         feature.getGeometry().setCoordinates([], 'XY');
 
         var xhr = new XMLHttpRequest();

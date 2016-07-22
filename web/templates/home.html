@@ -48,6 +48,15 @@
           zoom: 2
         })
       });
+      if (input.value.length > 0) {
+        if (typeof input.selectionStart == "number") {
+          input.selectionStart = input.selectionEnd = input.value.length;
+        } else {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        }
+        update();
+      }
     };
 
     var results = [];
@@ -122,7 +131,7 @@
 <body onload="init();">
   <h1>OSM Names full text search</h1>
   <form action="/" method="get">
-    <input autocomplete="off" id="search" type="text" name="q" autofocus="autofocus" />
+    <input autocomplete="off" id="search" type="text" name="q" autofocus="autofocus" value="{{query}}" />
     <input type="hidden" name="format" value="html" />
     <input class="btn" type="submit" onclick="update();return false;" value="Search" />
     <input class="btn" type="submit" value="Show debug results" />

@@ -2,6 +2,7 @@
 {% block title %}- Results{% endblock %}
 {% block result %}
 <hr>
+<p><a href="{{url_home}}">Show map with autocomplete</a></p>
 {% if rc %}
 <p>Found <b>{{ result['totalResults'] }}</b> results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
 <p>Used index {{result['index_succeed']}} for query <i>{{result['query_succeed']}}</i> with modify {{result['modify']}}</p>

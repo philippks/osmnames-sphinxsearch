@@ -386,6 +386,9 @@ Global searching
 @app.route('/')
 def search():
     data = {'query': '', 'route': '/', 'template': 'answer.html'}
+    layout = request.args.get('layout')
+    if layout and layout in ('answer', 'home'):
+        data['template'] = request.args.get('layout') + '.html'
     code = 400
 
     q = request.args.get('q')
@@ -491,6 +494,10 @@ def search():
     data['result'] = result
     data['autocomplete'] = autocomplete
     data['debug'] = debug
+    args = dict(request.args)
+    if 'layout' in args:
+        del(args['layout'])
+    data['url_home'] = url_for('search', layout='home', **args)
     return formatResponse(data, code)
 
 

@@ -5,25 +5,39 @@
   <meta name="author" content="Klokan Technologies GmbH" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.css" rel="stylesheet" />
+  <script src="https://klokantech.github.io/javascript/kt.js"></script>
+  <link href="https://klokantech.github.io/styles/base.css" rel="stylesheet" />
   <style>
     body {font-family:Arial;}
-    #map {position:absolute;top:100px;left:400px;right:0;bottom:0;}
-    #results {position:absolute;top:100px;left:0;width:400px;bottom:400px;overflow:auto;}
-    #results div {margin:3px;padding:3px;background:#eee;border:1px solid #ccc;}
-    #results div:hover {background:#ddd;}
-    #details {position:absolute;left:0;bottom:0;width:400px;height:400px;overflow:auto;font-size:.8em;margin:0;}
+    #map {position:absolute;top:0;left:0;right:0;bottom:0;}
+    #details {position:absolute;left:0;bottom:0;font-size:.7em;background:rgba(255,255,255,.6);}
+    input {display:inline-block;width:400px;position:absolute;top:10px;left:50%;margin-left:-200px;}
   </style>
   <script>
-    var input, resultsEl, detailsEl;
+    var detailsEl;
     var map;
     var feature = new ol.Feature({
       geometry: new ol.geom.Polygon([])
     });
     var init = function() {
-      input = document.getElementById('search');
-      resultsEl = document.getElementById('results');
+      var autocomplete = new kt.OsmNamesAutocomplete('search', '/');
+
+      autocomplete.registerCallback(function(item) {
+        var isDegenerate = (item.boundingbox[2] - item.boundingbox[0]) * (item.boundingbox[3] - item.boundingbox[1]) <= 0;
+        var extent = ol.extent.applyTransform(item.boundingbox, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
+
+        map.getView().fit(extent, map.getSize(), {
+          padding: [250, 50, 50, 50]
+        });
+        if (isDegenerate) {
+          map.getView().setZoom(20);
+        }
+        var coords = [[extent[0], extent[1]], [extent[0], extent[3]], [extent[2], extent[3]], [extent[2], extent[1]], [extent[0], extent[1]]];
+        feature.getGeometry().setCoordinates([coords], 'XY');
+        detailsEl.innerHTML = JSON.stringify(item, undefined, 2);
+      }, true);
+
       detailsEl = document.getElementById('details');
-      input.oninput = update;
 
       var source = new ol.source.Vector({
         features: [feature]
@@ -48,107 +62,12 @@
           zoom: 2
         })
       });
-      if (input.value.length > 0) {
-        if (typeof input.selectionStart == "number") {
-          input.selectionStart = input.selectionEnd = input.value.length;
-        } else {
-          input.focus();
-          input.setSelectionRange(input.value.length, input.value.length);
-        }
-        update();
-      }
-    };
-
-    var results = [];
-    var query = '';
-    var queryTimeoutId = null;
-    var activateTimeoutId = null;
-    var update = function() {
-      query = input.value;
-      if (queryTimeoutId) {
-        clearTimeout(queryTimeoutId);
-      }
-      if (query.length < 1) {
-        return;
-      }
-      queryTimeoutId = setTimeout(function() {
-        queryTimeoutId = null;
-        results = [];
-
-        var usedQuery = query;
-
-        resultsEl.innerHTML = 'Loading...';
-        detailsEl.innerHTML = '';
-        feature.getGeometry().setCoordinates([], 'XY');
-
-        var xhr = new XMLHttpRequest();
-        xhr.responseType = 'json';
-        xhr.onreadystatechange = function(e) {
-          if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-            if (usedQuery !== query && console && console.log) {
-              console.log('Ignoreing late result for:', usedQuery);
-              return;
-            }
-            results = e.target.response;
-            var html = '';
-
-            if (results.count == 0) {
-              html = 'No results found';
-            } else {
-              results.results.forEach(function(item, i) {
-                var isDegenerate = (item.boundingbox[2] - item.boundingbox[0]) * (item.boundingbox[3] - item.boundingbox[1]) <= 0;
-                var type = item.type;
-                if (item.class == 'street') {
-                  type = item.class;
-                }
-                html += '<div onmouseover="activate(' + i + ')">' + item.display_name + ' <span class="type">[' + type + (isDegenerate ? '] [<b>empty</b>' : '') + ']</span></div>';
-              });
-            }
-            if (activateTimeoutId) {
-              clearInterval(activateTimeoutId);
-              activateTimeoutId = null;
-            }
-            activateTimeoutId = setTimeout(function(){activate(results.count ? 0 : null);}, 50);
-
-            resultsEl.innerHTML = html;
-          }
-        };
-        xhr.open('GET', '/?q=' + encodeURIComponent(usedQuery) + '&format=json&autocomplete=1', true);
-        xhr.send();
-      }, 500);
-    };
-
-    var activate = function(i) {
-      var item = results.results[i];
-      if (console && console.log) {
-        console.log('Bounding box: ', item.boundingbox);
-      }
-
-      var isDegenerate = (item.boundingbox[2] - item.boundingbox[0]) * (item.boundingbox[3] - item.boundingbox[1]) <= 0;
-      var extent = ol.extent.applyTransform(item.boundingbox, ol.proj.getTransform('EPSG:4326', 'EPSG:3857'));
-      map.getView().fit(extent, map.getSize());
-      if (isDegenerate) {
-        map.getView().setZoom(20);
-      }
-      var coords = [[extent[0], extent[1]], [extent[0], extent[3]], [extent[2], extent[3]], [extent[2], extent[1]], [extent[0], extent[1]]];
-      feature.getGeometry().setCoordinates([coords], 'XY');
-      detailsEl.innerHTML = JSON.stringify(item, undefined, 2);
     };
   </script>
 </head>
 <body onload="init();">
-  <h1>OSM Names full text search</h1>
-  <form action="/" method="get">
-    <input autocomplete="off" id="search" type="text" name="q" autofocus="autofocus" value="{{query}}" />
-    <input type="hidden" name="format" value="html" />
-    <input class="btn" type="submit" onclick="update();return false;" value="Search" />
-    <input class="btn" type="submit" value="Show debug results" />
-  </form>
-
-  <div id="results">
-    Type in the search box above to see results here.
-  </div>
-  <pre id="details"></pre>
   <div id="map"></div>
+  <pre id="details"></pre>
+  <form><input autocomplete="off" id="search" type="text" autofocus="autofocus" placeholder="Type here to search.." /></form>
 </body>
 </html>

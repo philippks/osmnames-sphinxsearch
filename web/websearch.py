@@ -211,6 +211,10 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     query_elements = re.compile("\s*,\s*|\s+").split(query)
     select_boost = []
     argsBoost = []
+    # Boost whole query (street with spaces)
+    select_boost.append('IF(name=%s,1000000,0)')
+    argsBoost.append(query)
+    # Boost each query part delimited by space
     for qe in query_elements:
         qe = re.sub(r"\**", "", qe)
         select_boost.append('IF(name=%s,1000000,0)')

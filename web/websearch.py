@@ -456,45 +456,52 @@ def search():
     data['url'] = request.url
 
     orig_query = data['query']
-    index = None
 
     if debug:
         times['prepare'] = time() - times['start']
 
-    modifiers = []
+    index_modifiers = []
     if autocomplete:
-        modifiers.append(modify_query_autocomplete)
-    modifiers.append(modify_query_orig)
-    modifiers.append(modify_query_remhouse)
-    modifiers.append(modify_query_splitor)
+        index_modifiers.append( ('ind_name', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_name', modify_query_orig) )
+    index_modifiers.append( ('ind_name', modify_query_remhouse, orig_query) )
+    if autocomplete:
+        index_modifiers.append( ('ind_name_soundex', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_name_soundex', modify_query_orig) )
+    index_modifiers.append( ('ind_name_soundex', modify_query_remhouse, orig_query) )
+    # We want first to try soundex, than splitor modifier for both index
+    index_modifiers.append( ('ind_name', modify_query_splitor) )
+    index_modifiers.append( ('ind_name_soundex', modify_query_splitor) )
     if debug:
-        pprint(modifiers)
+        pprint(index_modifiers)
 
     rc = False
     result = {}
-    for ind in ['ind_name', 'ind_name_soundex',]:
-        proc_query = orig_query
-        index = ind
+    proc_query = orig_query
+    # Pair is (index, modify_function, [orig_query])
+    for pair in index_modifiers:
+        index = pair[0]
+        modify = pair[1]
+        if len(pair) >= 3:
+            proc_query = pair[2]
         if debug:
-            times[ind] = {}
+            times[index] = {}
         # Cycle through few modifications of query
-        for modify in modifiers:
-            query, proc_query = modify(proc_query)
-            # No modification
-            if query is None:
-                continue
-            # Process modified query
-            if debug:
-                times['start_query'] = time()
-            rc, result = process_query_mysql(index, query, query_filter, start, count)
-            if debug:
-                times[ind][modify.__name__] = time() - times['start_query']
-            if rc and len(result['results']) > 0:
-                result['modify'] = modify.__name__
-                result['query_succeed'] = query.decode('utf-8')
-                result['index_succeed'] = index.decode('utf-8')
-                break
-        if rc and 'results' in result and len(result['results']) > 0:
+        # Modification function return query with original query (possibly modified) used for the following processing
+        query, proc_query = modify(proc_query)
+        # No modification has been done
+        if query is None:
+            continue
+        # Process modified query
+        if debug:
+            times['start_query'] = time()
+        rc, result = process_query_mysql(index, query, query_filter, start, count)
+        if debug:
+            times[index][modify.__name__] = time() - times['start_query']
+        if rc and len(result['results']) > 0:
+            result['modify'] = modify.__name__
+            result['query_succeed'] = query.decode('utf-8')
+            result['index_succeed'] = index.decode('utf-8')
             break
 
     if rc:

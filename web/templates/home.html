@@ -5,21 +5,28 @@
   <meta name="author" content="Klokan Technologies GmbH" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.css" rel="stylesheet" />
+  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.16.0/mapbox-gl.js"></script>
+  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.16.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://klokantech.github.io/javascript/kt.js"></script>
   <link href="https://klokantech.github.io/styles/base.css" rel="stylesheet" />
   <style>
     body {font-family:Arial;}
-    #map {position:absolute;top:0;left:0;right:0;bottom:0;}
+    #map-ol, #map-gl {position:absolute;top:0;left:0;right:0;bottom:0;}
     #details {position:absolute;left:0;bottom:0;font-size:.7em;background:rgba(255,255,255,.6);}
     input {display:inline-block;width:400px;position:absolute;top:10px;left:50%;margin-left:-200px;}
+    .ol-logo-only {display:none;}
   </style>
   <script>
-    var detailsEl;
-    var map;
-    var feature = new ol.Feature({
-      geometry: new ol.geom.Polygon([])
-    });
     var init = function() {
+      var detailsEl = document.getElementById('details');
+      var feature = new ol.Feature({
+        geometry: new ol.geom.Polygon([])
+      });
+
+      var map = new kt.VectorMap(
+        'https://klokantech.tilehosting.com/styles/streets.json?key=tX0QWNRowlarrQpqxngS',
+        'https://klokantech.tilehosting.com/styles/streets/rendered.json?key=tX0QWNRowlarrQpqxngS',
+        'map-ol', 'map-gl').getMap();
       var autocomplete = new kt.OsmNamesAutocomplete('search', '/');
 
       autocomplete.registerCallback(function(item) {
@@ -37,36 +44,17 @@
         detailsEl.innerHTML = JSON.stringify(item, undefined, 2);
       }, true);
 
-      detailsEl = document.getElementById('details');
-
-      var source = new ol.source.Vector({
-        features: [feature]
-      });
-
-      var layer = new ol.layer.Vector({
-        source: source
-      });
-
-      map = new ol.Map({
-        layers: [
-          new ol.layer.Tile({
-            source: new ol.source.TileJSON({
-              url: 'http://klokantech.tilehosting.com/styles/streets/rendered.json?key=tX0QWNRowlarrQpqxngS'
-            })
-          }),
-          layer
-        ],
-        target: 'map',
-        view: new ol.View({
-          center: [0, 0],
-          zoom: 2
+      map.addLayer(new ol.layer.Vector({
+        source: new ol.source.Vector({
+          features: [feature]
         })
-      });
+      }));
     };
   </script>
 </head>
 <body onload="init();">
-  <div id="map"></div>
+  <div id="map-gl"></div>
+  <div id="map-ol"></div>
   <pre id="details"></pre>
   <form><input autocomplete="off" id="search" type="text" autofocus="autofocus" placeholder="Type here to search.." /></form>
 </body>

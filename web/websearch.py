@@ -213,12 +213,13 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     argsBoost = []
     # Boost whole query (street with spaces)
     select_boost.append('IF(name=%s,1000000,0)')
-    argsBoost.append(query)
+    argsBoost.append(re.sub(r"\**", "", query))
     # Boost each query part delimited by space
     for qe in query_elements:
-        qe = re.sub(r"\**", "", qe)
         select_boost.append('IF(name=%s,1000000,0)')
-        argsBoost.append(qe)
+        argsBoost.append(re.sub(r"\**", "", qe))
+
+    # Prepare SELECT
     sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
         '+'.join(select_boost),
         index,

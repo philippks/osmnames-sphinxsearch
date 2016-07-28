@@ -353,7 +353,9 @@ def formatResponse(data, code=200):
     if request.args.get('callback'):
         json = request.args.get('callback') + "("+json+");";
         mime = 'application/javascript'
-    return Response(json, mimetype=mime), code
+    resp = Response(json, mimetype=mime)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp, code
 
 
 # ---------------------------------------------------------

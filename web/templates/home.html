@@ -5,8 +5,8 @@
   <meta name="author" content="Klokan Technologies GmbH" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/ol3/3.17.1/ol.css" rel="stylesheet" />
-  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.16.0/mapbox-gl.js"></script>
-  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.16.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.22.1/mapbox-gl.js"></script>
+  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.22.1/mapbox-gl.css" rel="stylesheet">
   <script src="https://klokantech.github.io/javascript/kt.js"></script>
   <link href="https://klokantech.github.io/styles/base.css" rel="stylesheet" />
   <style>
@@ -24,8 +24,8 @@
       });
 
       var map = new kt.VectorMap(
-        'https://klokantech.tilehosting.com/styles/streets.json?key=tX0QWNRowlarrQpqxngS',
-        'https://klokantech.tilehosting.com/styles/streets/rendered.json?key=tX0QWNRowlarrQpqxngS',
+        'https://klokantech.tilehosting.com/styles/basic.json?key=tX0QWNRowlarrQpqxngS',
+        'https://klokantech.tilehosting.com/styles/basic/rendered.json?key=tX0QWNRowlarrQpqxngS',
         'map-ol', 'map-gl').getMap();
       var autocomplete = new kt.OsmNamesAutocomplete('search', true, '/');
 

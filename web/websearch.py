@@ -472,7 +472,7 @@ def search():
         index_modifiers.append( ('ind_name_soundex', modify_query_autocomplete) )
     index_modifiers.append( ('ind_name_soundex', modify_query_orig) )
     index_modifiers.append( ('ind_name_soundex', modify_query_remhouse, orig_query) )
-    # We want first to try soundex, than splitor modifier for both index
+    # We want first to try soundex, then splitor modifier for both index
     index_modifiers.append( ('ind_name', modify_query_splitor) )
     index_modifiers.append( ('ind_name_soundex', modify_query_splitor) )
     if debug:
@@ -487,7 +487,7 @@ def search():
         modify = pair[1]
         if len(pair) >= 3:
             proc_query = pair[2]
-        if debug:
+        if debug and index not in times:
             times[index] = {}
         # Cycle through few modifications of query
         # Modification function return query with original query (possibly modified) used for the following processing

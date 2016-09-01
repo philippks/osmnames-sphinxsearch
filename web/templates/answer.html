@@ -54,7 +54,7 @@
 {% else %}
 <p>Found 0 results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
 <pre>
-  {{ result | nl2br | safe}}
+  {{ result | nl2br | ppretty}}
 </pre>
 {% endif %}
 {% endblock %}

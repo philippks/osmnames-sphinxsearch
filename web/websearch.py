@@ -205,19 +205,19 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     #  - 'retry_count' - integer (distributed retries count)
     #  - 'retry_delay' - integer (distributed retry delay, msec)
     option = "field_weights = (name = 100, display_name = 1)"
-    option += ", retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 10000"
-    option += ", ranker=expr('sum((10*lcs+5*exact_order+5*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
+    option += ", retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
+    option += ", ranker=expr('sum((10*lcs+5*exact_order+10*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
     # Prepare query for boost
     query_elements = re.compile("\s*,\s*|\s+").split(query)
     select_boost = []
     argsBoost = []
     # Boost whole query (street with spaces)
-    select_boost.append('IF(name=%s,1000000,0)')
-    argsBoost.append(re.sub(r"\**", "", query))
+    # select_boost.append('IF(name=%s,1000000,0)')
+    # argsBoost.append(re.sub(r"\**", "", query))
     # Boost each query part delimited by space
-    for qe in query_elements:
-        select_boost.append('IF(name=%s,1000000,0)')
-        argsBoost.append(re.sub(r"\**", "", qe))
+    # for qe in query_elements:
+    #    select_boost.append('IF(name=%s,1000000,0)')
+    #    argsBoost.append(re.sub(r"\**", "", qe))
 
     # Prepare SELECT
     sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
@@ -465,16 +465,21 @@ def search():
 
     index_modifiers = []
     if autocomplete:
-        index_modifiers.append( ('ind_name', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_name', modify_query_orig) )
-    index_modifiers.append( ('ind_name', modify_query_remhouse, orig_query) )
+        index_modifiers.append( ('ind_name_prefix', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_name_prefix', modify_query_orig) )
+    index_modifiers.append( ('ind_name_prefix', modify_query_remhouse, orig_query) )
     if autocomplete:
-        index_modifiers.append( ('ind_name_soundex', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_name_soundex', modify_query_orig) )
-    index_modifiers.append( ('ind_name_soundex', modify_query_remhouse, orig_query) )
+        index_modifiers.append( ('ind_name_infix', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_name_infix', modify_query_orig) )
+    index_modifiers.append( ('ind_name_infix', modify_query_remhouse, orig_query) )
+    if autocomplete:
+        index_modifiers.append( ('ind_name_prefix_soundex', modify_query_autocomplete) )
+        index_modifiers.append( ('ind_name_infix_soundex', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_orig) )
+    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_remhouse, orig_query) )
     # We want first to try soundex, then splitor modifier for both index
-    index_modifiers.append( ('ind_name', modify_query_splitor) )
-    index_modifiers.append( ('ind_name_soundex', modify_query_splitor) )
+    index_modifiers.append( ('ind_name_prefix', modify_query_splitor) )
+    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_splitor) )
     if debug:
         pprint(index_modifiers)
 

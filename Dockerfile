@@ -3,6 +3,7 @@ FROM debian:8
 RUN apt-get -qq update && apt-get install -qq -y --no-install-recommends \
     ca-certificates \
     curl \
+    gawk \
     libexpat1 \
     libpq5 \
     mysql-client \

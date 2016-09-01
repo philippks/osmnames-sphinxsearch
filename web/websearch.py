@@ -204,7 +204,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     #  - 'max_query_time' - integer (max search time threshold, msec)
     #  - 'retry_count' - integer (distributed retries count)
     #  - 'retry_delay' - integer (distributed retry delay, msec)
-    option = "field_weights = (name = 100, display_name = 1)"
+    option = "field_weights = (name = 100, alternative_names = 80, display_name = 1)"
     option += ", retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+10*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
     # Prepare query for boost
@@ -212,16 +212,16 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     select_boost = []
     argsBoost = []
     # Boost whole query (street with spaces)
-    # select_boost.append('IF(name=%s,1000000,0)')
-    # argsBoost.append(re.sub(r"\**", "", query))
+    select_boost.append('IF(name=%s,1000000,0)')
+    argsBoost.append(re.sub(r"\**", "", query))
     # Boost each query part delimited by space
-    # for qe in query_elements:
-    #    select_boost.append('IF(name=%s,1000000,0)')
-    #    argsBoost.append(re.sub(r"\**", "", qe))
+    for qe in query_elements:
+       select_boost.append('IF(name=%s,1000000,0)')
+       argsBoost.append(re.sub(r"\**", "", qe))
 
     # Prepare SELECT
     sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
-        '+'.join(select_boost),
+        '+'.join(select_boost) if len(select_boost) > 0 else '0',
         index,
         ' AND '.join(whereFilter),
         ', '.join(sortBy),

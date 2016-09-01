@@ -149,10 +149,6 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     argsFilter = []
     whereFilter = []
 
-    # Prepare query
-    whereFilter.append('MATCH(%s)')
-    argsFilter.append(query)
-
     # Prepare filter for query
     for f in ['class', 'type', 'street', 'city', 'county', 'state', 'country_code', 'country']:
         if query_filter[f] is None:
@@ -174,6 +170,11 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
         whereFilter.append('({:.12f} < lon AND lon < {:.12f})'
             .format(float(bbox[1]), float(bbox[3])))
 
+    # MATCH query should be last in the WHERE condition
+    # Prepare query
+    whereFilter.append('MATCH(%s)')
+    argsFilter.append(query)
+
     sortBy = []
     # Prepare sorting by custom or default
     if query_filter['sortBy'] is not None:
@@ -192,6 +193,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
 
     if len(sortBy) == 0:
         sortBy.append('weight DESC')
+
 
     # Field weights and other options
     # ranker=expr('sum(lcs*user_weight)*1000+bm25') == SPH_RANK_PROXIMITY_BM25
@@ -215,9 +217,11 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     select_boost.append('IF(name=%s,1000000,0)')
     argsBoost.append(re.sub(r"\**", "", query))
     # Boost each query part delimited by space
-    for qe in query_elements:
-       select_boost.append('IF(name=%s,1000000,0)')
-       argsBoost.append(re.sub(r"\**", "", qe))
+    # Only if there is more than 1 query elements
+    if len(query_elements) > 1:
+        for qe in query_elements:
+           select_boost.append('IF(name=%s,1000000,0)')
+           argsBoost.append(re.sub(r"\**", "", qe))
 
     # Prepare SELECT
     sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(

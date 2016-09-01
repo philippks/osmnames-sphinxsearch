@@ -359,6 +359,8 @@ def formatResponse(data, code=200):
         mime = 'application/javascript'
     resp = Response(json, mimetype=mime)
     resp.headers['Access-Control-Allow-Origin'] = '*'
+    # Cache results for 4 hours in Web Browsers and 12 hours in CDN caches
+    resp.headers['Cache-Control'] = 'public, max-age=14400, s-maxage=43200'
     return resp, code
 
 

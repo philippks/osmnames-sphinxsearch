@@ -630,7 +630,7 @@ def search():
             debug_result['query_succeed'].append(query.decode('utf-8'))
             debug_result['index_succeed'].append(index.decode('utf-8'))
             # Only break, if we have enough matches
-            if len(result['matches']) > result['count']:
+            if len(result['matches']) >= result['count']:
                 break
 
     if rc:

@@ -618,10 +618,10 @@ def search():
             times[index][modify.__name__] = time() - times['start_query']
         if rc and len(result_new['results']) > 0:
             # Merge results with previous result
-            if len(result['results']) > 0:
+            if 'results' in result and len(result['results']) > 0:
                 result = mergeResultObject(result, result_new)
             else:
-                result = result_new
+                result = result_new.copy()
                 result['modify'] = []
                 result['query_succeed'] = []
                 result['index_succeed'] = []

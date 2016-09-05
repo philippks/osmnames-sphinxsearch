@@ -5,10 +5,10 @@
 <p><a href="{{url_home}}">Show map with autocomplete</a></p>
 {% if rc %}
 <p>Found <b>{{ result['totalResults'] }}</b> results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
-<p>Used index {{result['index_succeed']}} for query <i>{{result['query_succeed']}}</i> with modify {{result['modify']}}</p>
-{% if 'times' in result %}
-<p>Times: prepare {{result['times']['prepare']}}, total {{result['times']['process']}}</p>
-<pre>{{result['times'] | ppretty}}</pre>
+<p>Used index {{debug_result['index_succeed']}} for query <i>{{debug_result['query_succeed']}}</i> with modify {{debug_result['modify']}}</p>
+{% if 'times' in debug_result %}
+<p>Times: prepare {{debug_result['times']['prepare']}}, total {{debug_result['times']['process']}}</p>
+<pre>{{debug_result['times'] | ppretty}}</pre>
 {% endif %}
 <p>Showing <b>{{ result['results'] | length }}</b> results</p>
 <table class="entries" width="100%" border="1" style="border-collapse: collapse;">

@@ -277,7 +277,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     result['count'] = count
     result['startIndex'] = start
     result['status'] = status
-    return status, prepareResultJson(result, query_filter)
+    return status, result
 
 
 
@@ -589,6 +589,7 @@ def search():
 
     rc = False
     result = {}
+    debug_result = {}
     proc_query = orig_query
     # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
     for pair in index_modifiers:
@@ -616,20 +617,20 @@ def search():
             start, count, field_weights, index_weights)
         if debug:
             times[index][modify.__name__] = time() - times['start_query']
-        if rc and len(result_new['results']) > 0:
-            # Merge results with previous result
-            if 'results' in result and len(result['results']) > 0:
+        if rc and len(result_new['matches']) > 0:
+            # Merge matches with previous result
+            if 'matches' in result and len(result['matches']) > 0:
                 result = mergeResultObject(result, result_new)
             else:
                 result = result_new.copy()
-                result['modify'] = []
-                result['query_succeed'] = []
-                result['index_succeed'] = []
-            result['modify'].append(modify.__name__)
-            result['query_succeed'].append(query.decode('utf-8'))
-            result['index_succeed'].append(index.decode('utf-8'))
+                debug_result['modify'] = []
+                debug_result['query_succeed'] = []
+                debug_result['index_succeed'] = []
+            debug_result['modify'].append(modify.__name__)
+            debug_result['query_succeed'].append(query.decode('utf-8'))
+            debug_result['index_succeed'].append(index.decode('utf-8'))
             # Only break, if we have enough matches
-            if len(result['results']) > result['count']:
+            if len(result['matches']) > result['count']:
                 break
 
     if rc:
@@ -638,8 +639,9 @@ def search():
     data['query'] = orig_query.decode('utf-8')
     if debug:
         times['process'] = time() - times['start']
-        result['times'] = times
-    data['result'] = result
+        debug_result['times'] = times
+    data['result'] = prepareResultJson(result, query_filter)
+    data['debug_result'] = debug_result
     data['autocomplete'] = autocomplete
     data['debug'] = debug
     args = dict(request.args)

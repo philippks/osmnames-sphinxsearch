@@ -40,7 +40,7 @@ if getenv('SEARCH_DEFAULT_COUNT'):
 """
 Process query to Sphinx searchd
 """
-def process_query(index, query, query_filter, start=0, count=0):
+def process_query(index, query, query_filter, start=0, count=0, field_weights='', index_weights=''):
     # default server configuration
     host = 'localhost'
     port = 9312
@@ -119,7 +119,7 @@ def process_query(index, query, query_filter, start=0, count=0):
 """
 Process query to Sphinx searchd with mysql
 """
-def process_query_mysql(index, query, query_filter, start=0, count=0):
+def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights='', index_weights=''):
     global SEARCH_MAX_COUNT, SEARCH_DEFAULT_COUNT
     # default server configuration
     host = '127.0.0.1'
@@ -207,9 +207,12 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     #  - 'max_query_time' - integer (max search time threshold, msec)
     #  - 'retry_count' - integer (distributed retries count)
     #  - 'retry_delay' - integer (distributed retry delay, msec)
-    option = "field_weights = (name = 100, alternative_names = 80, display_name = 1)"
-    option += ", retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
+    option = "retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+10*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
+    if len(index_weights) > 0:
+        option += ", index_weights = ({})".format(index_weights)
+    if len(field_weights) > 0:
+        option += ", field_weights = ({})".format(field_weights)
     # Prepare query for boost
     query_elements = re.compile("\s*,\s*|\s+").split(query)
     select_boost = []
@@ -519,39 +522,85 @@ def search():
     # 3. Infix with Soundex on names - full text
     index_modifiers = []
 
+    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
+
     # 1. Boosted name
     if autocomplete:
-        index_modifiers.append( ('ind_name', modify_query_autocomplete, 'ind_name_exact=3, ind_name_prefix=1') )
-    index_modifiers.append( ('ind_name', modify_query_orig, 'ind_name_exact=3, ind_name_prefix=1') )
-    index_modifiers.append( ('ind_name', modify_query_remhouse, 'ind_name_exact=3, ind_name_prefix=1', orig_query) )
+        index_modifiers.append( ('ind_name',
+                modify_query_autocomplete,
+                'name = 100, alternative_names = 80',
+                'ind_name_exact=3, ind_name_prefix=1',
+            ) )
+    index_modifiers.append( ('ind_name',
+            modify_query_orig,
+            'name = 100, alternative_names = 80',
+            'ind_name_exact=3, ind_name_prefix=1',
+        ) )
+    index_modifiers.append( ('ind_name',
+            modify_query_remhouse,
+            'name = 100, alternative_names = 80',
+            'ind_name_exact=3, ind_name_prefix=1',
+            orig_query,
+        ) )
     # 2. Prefix on names
     if autocomplete:
-        index_modifiers.append( ('ind_names_prefix', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_names_prefix', modify_query_orig) )
-    index_modifiers.append( ('ind_names_prefix', modify_query_remhouse, '', orig_query) )
+        index_modifiers.append( ('ind_names_prefix',
+                modify_query_autocomplete,
+                'name = 100, alternative_names = 80, display_name = 1',
+            ) )
+    index_modifiers.append( ('ind_names_prefix',
+            modify_query_orig,
+            'name = 100, alternative_names = 80, display_name = 1',
+        ) )
+    index_modifiers.append( ('ind_names_prefix',
+            modify_query_remhouse,
+            'name = 100, alternative_names = 80, display_name = 1',
+            '',
+            orig_query,
+        ) )
     # 3. Infix with soundex on names
     if autocomplete:
-        index_modifiers.append( ('ind_names_infix_soundex', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_names_infix_soundex', modify_query_orig) )
-    index_modifiers.append( ('ind_names_infix_soundex', modify_query_remhouse, '', orig_query) )
+        index_modifiers.append( ('ind_names_infix_soundex',
+                modify_query_autocomplete,
+                'name = 100, alternative_names = 80, display_name = 1',
+            ) )
+    index_modifiers.append( ('ind_names_infix_soundex',
+            modify_query_orig,
+            'name = 100, alternative_names = 80, display_name = 1',
+        ) )
+    index_modifiers.append( ('ind_names_infix_soundex',
+            modify_query_remhouse,
+            'name = 100, alternative_names = 80, display_name = 1',
+            '',
+            orig_query,
+        ) )
     # 4. We want first to try soundex, then splitor modifier for both index
-    index_modifiers.append( ('ind_names_prefix', modify_query_splitor) )
-    index_modifiers.append( ('ind_names_infix_soundex', modify_query_splitor) )
+    index_modifiers.append( ('ind_names_prefix',
+            modify_query_splitor,
+            'name = 100, alternative_names = 80, display_name = 1',
+        ) )
+    index_modifiers.append( ('ind_names_infix_soundex',
+            modify_query_splitor,
+            'name = 100, alternative_names = 80, display_name = 1',
+        ) )
+
     if debug:
         pprint(index_modifiers)
 
     rc = False
     result = {}
     proc_query = orig_query
-    # Pair is (index, modify_function, [index_weights, [orig_query]])
+    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
     for pair in index_modifiers:
         index = pair[0]
         modify = pair[1]
         index_weights = ''
         if len(pair) >= 3:
-            index_weights = pair[2]
+            field_weights = pair[2]
         if len(pair) >= 4:
-            proc_query = pair[3]
+            index_weights = pair[3]
+        if len(pair) >= 5:
+            proc_query = pair[4]
         if debug and index not in times:
             times[index] = {}
         # Cycle through few modifications of query
@@ -563,7 +612,8 @@ def search():
         # Process modified query
         if debug:
             times['start_query'] = time()
-        rc, result_new = process_query_mysql(index, query, query_filter, start, count, index_weights)
+        rc, result_new = process_query_mysql(index, query, query_filter,
+            start, count, field_weights, index_weights)
         if debug:
             times[index][modify.__name__] = time() - times['start_query']
         if rc and len(result_new['results']) > 0:

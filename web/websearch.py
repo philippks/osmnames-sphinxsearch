@@ -295,7 +295,7 @@ def mergeResultObject(result_old, result_new):
         for row in matches:
             weight = str(row['weight'])
             if weight in weight_matches:
-                weight += '_' + unique_id
+                weight += '_{}'.format(unique_id)
                 unique_id += 1
             weight_matches[weight] = row
 

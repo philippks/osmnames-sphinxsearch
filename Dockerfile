@@ -17,7 +17,8 @@ RUN apt-get -qq update && apt-get install -qq -y --no-install-recommends \
     python-mysqldb \
     unixodbc \
     uwsgi \
-    uwsgi-plugin-python
+    uwsgi-plugin-python \
+&& pip install -q natsort
 
 RUN curl -s \
     http://sphinxsearch.com/files/sphinxsearch_2.2.10-release-1~jessie_amd64.deb \

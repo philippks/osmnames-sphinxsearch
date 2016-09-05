@@ -19,6 +19,7 @@ import requests
 import sys
 import MySQLdb
 import re
+import natsort
 
 app = Flask(__name__, template_folder='templates/')
 app.debug = not getenv('WEBSEARCH_DEBUG') is None
@@ -111,7 +112,7 @@ def process_query(index, query, query_filter, start=0, count=0):
     result['startIndex'] = start
     result['status'] = status
 
-    return status, prepareResultJson(result, query_filter)
+    return status, result
 
 
 # ---------------------------------------------------------
@@ -276,7 +277,50 @@ def process_query_mysql(index, query, query_filter, start=0, count=0):
     return status, prepareResultJson(result, query_filter)
 
 
+
 # ---------------------------------------------------------
+"""
+Merge two result objects into one
+Order matches by weight
+"""
+def mergeResultObject(result_old, result_new):
+    # Merge matches
+    weight_matches = {}
+    unique_id = 0
+
+    for matches in [result_old['matches'], result_new['matches'], ]:
+        for row in matches:
+            weight = str(row['weight'])
+            if weight in weight_matches:
+                weight += '_' + unique_id
+                unique_id += 1
+            weight_matches[weight] = row
+
+    # Sort matches according to the weight and unique id
+    sorted_matches = natsort.natsorted(weight_matches.items())
+    matches = []
+    i = 0
+    for row in sorted_matches:
+        matches.append(row[1])
+        i += 1
+        # Append only first #count rows
+        if i > result_old['count']:
+            break
+
+    result = result_old.copy()
+    result['matches'] = matches
+    result['totalResults'] += result_new['totalResults']
+    if ('message' not in result or not len(result['message'])) and 'message' in result_new:
+        result['message'] = result_new['message']
+
+    return result
+
+
+
+# ---------------------------------------------------------
+"""
+Prepare JSON from pure Result array from SphinxQL
+"""
 def prepareResultJson(result, query_filter):
     from pprint import pprint
 
@@ -469,35 +513,45 @@ def search():
     if debug:
         times['prepare'] = time() - times['start']
 
+    # Iterating only over 3 index
+    # 1. Boosted prefix+exact on name
+    # 2. Prefix on names - full text
+    # 3. Infix with Soundex on names - full text
     index_modifiers = []
+
+    # 1. Boosted name
     if autocomplete:
-        index_modifiers.append( ('ind_name_prefix', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_name_prefix', modify_query_orig) )
-    index_modifiers.append( ('ind_name_prefix', modify_query_remhouse, orig_query) )
+        index_modifiers.append( ('ind_name', modify_query_autocomplete, 'ind_name_exact=3, ind_name_prefix=1') )
+    index_modifiers.append( ('ind_name', modify_query_orig, 'ind_name_exact=3, ind_name_prefix=1') )
+    index_modifiers.append( ('ind_name', modify_query_remhouse, 'ind_name_exact=3, ind_name_prefix=1', orig_query) )
+    # 2. Prefix on names
     if autocomplete:
-        index_modifiers.append( ('ind_name_infix', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_name_infix', modify_query_orig) )
-    index_modifiers.append( ('ind_name_infix', modify_query_remhouse, orig_query) )
+        index_modifiers.append( ('ind_names_prefix', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_names_prefix', modify_query_orig) )
+    index_modifiers.append( ('ind_names_prefix', modify_query_remhouse, '', orig_query) )
+    # 3. Infix with soundex on names
     if autocomplete:
-        index_modifiers.append( ('ind_name_prefix_soundex', modify_query_autocomplete) )
-        index_modifiers.append( ('ind_name_infix_soundex', modify_query_autocomplete) )
-    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_orig) )
-    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_remhouse, orig_query) )
-    # We want first to try soundex, then splitor modifier for both index
-    index_modifiers.append( ('ind_name_prefix', modify_query_splitor) )
-    index_modifiers.append( ('ind_name_prefix_soundex', modify_query_splitor) )
+        index_modifiers.append( ('ind_names_infix_soundex', modify_query_autocomplete) )
+    index_modifiers.append( ('ind_names_infix_soundex', modify_query_orig) )
+    index_modifiers.append( ('ind_names_infix_soundex', modify_query_remhouse, '', orig_query) )
+    # 4. We want first to try soundex, then splitor modifier for both index
+    index_modifiers.append( ('ind_names_prefix', modify_query_splitor) )
+    index_modifiers.append( ('ind_names_infix_soundex', modify_query_splitor) )
     if debug:
         pprint(index_modifiers)
 
     rc = False
     result = {}
     proc_query = orig_query
-    # Pair is (index, modify_function, [orig_query])
+    # Pair is (index, modify_function, [index_weights, [orig_query]])
     for pair in index_modifiers:
         index = pair[0]
         modify = pair[1]
+        index_weights = ''
         if len(pair) >= 3:
-            proc_query = pair[2]
+            index_weights = pair[2]
+        if len(pair) >= 4:
+            proc_query = pair[3]
         if debug and index not in times:
             times[index] = {}
         # Cycle through few modifications of query
@@ -509,14 +563,24 @@ def search():
         # Process modified query
         if debug:
             times['start_query'] = time()
-        rc, result = process_query_mysql(index, query, query_filter, start, count)
+        rc, result_new = process_query_mysql(index, query, query_filter, start, count, index_weights)
         if debug:
             times[index][modify.__name__] = time() - times['start_query']
-        if rc and len(result['results']) > 0:
-            result['modify'] = modify.__name__
-            result['query_succeed'] = query.decode('utf-8')
-            result['index_succeed'] = index.decode('utf-8')
-            break
+        if rc and len(result_new['results']) > 0:
+            # Merge results with previous result
+            if len(result['results']) > 0:
+                result = mergeResultObject(result, result_new)
+            else:
+                result = result_new
+                result['modify'] = []
+                result['query_succeed'] = []
+                result['index_succeed'] = []
+            result['modify'].append(modify.__name__)
+            result['query_succeed'].append(query.decode('utf-8'))
+            result['index_succeed'].append(index.decode('utf-8'))
+            # Only break, if we have enough matches
+            if len(result['results']) > result['count']:
+                break
 
     if rc:
         code = 200

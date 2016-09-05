@@ -300,21 +300,21 @@ def mergeResultObject(result_old, result_new):
             weight_matches[weight] = row
 
     # Sort matches according to the weight and unique id
-    sorted_matches = natsort.natsorted(weight_matches.items())
+    sorted_matches = natsort.natsorted(weight_matches.items(), reverse=True)
     matches = []
     i = 0
     for row in sorted_matches:
         matches.append(row[1])
         i += 1
         # Append only first #count rows
-        if i > result_old['count']:
+        if i >= result_old['count']:
             break
 
     result = result_old.copy()
     result['matches'] = matches
-    result['totalResults'] += result_new['totalResults']
-    if ('message' not in result or not len(result['message'])) and 'message' in result_new:
-        result['message'] = result_new['message']
+    result['total_found'] += result_new['total_found']
+    if 'message' in result_new and result_new['message']:
+        result['message'] = ', '.join(result['message'], result_new['message'])
 
     return result
 

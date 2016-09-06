@@ -270,7 +270,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
 
         q = cursor.execute('SHOW META LIKE %s', ('total_found',))
         for row in cursor:
-            result['total_found'] = row[1]
+            result['total_found'] = int(row[1])
     except Exception as ex:
         status = False
         result['message'] = str(ex)
@@ -449,6 +449,65 @@ def modify_query_splitor(orig_query):
     return query, orig_query
 
 
+
+# ---------------------------------------------------------
+"""
+Process array of modifiers and return results
+"""
+def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
+    query_filter, start, count, debug = False):
+    rc = False
+    result = {}
+    proc_query = orig_query
+    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
+    for pair in index_modifiers:
+        index = pair[0]
+        modify = pair[1]
+        field_weights = ''
+        index_weights = ''
+        if len(pair) >= 3:
+            field_weights = pair[2]
+        if len(pair) >= 4:
+            index_weights = pair[3]
+        if len(pair) >= 5:
+            proc_query = pair[4]
+        if debug and index not in times:
+            times[index] = {}
+        # Cycle through few modifications of query
+        # Modification function return query with original query (possibly modified) used for the following processing
+        query, proc_query = modify(proc_query)
+        # No modification has been done
+        if query is None:
+            continue
+        # Process modified query
+        if debug:
+            times['start_query'] = time()
+        rc, result_new = process_query_mysql(index, query, query_filter,
+            start, count, field_weights, index_weights)
+        if debug:
+            times[index][modify.__name__] = time() - times['start_query']
+        if rc and 'matches' in result_new and len(result_new['matches']) > 0:
+            # Merge matches with previous result
+            if 'matches' in result and len(result['matches']) > 0:
+                result = mergeResultObject(result, result_new)
+            else:
+                result = result_new.copy()
+                debug_result['modify'] = []
+                debug_result['query_succeed'] = []
+                debug_result['index_succeed'] = []
+            debug_result['modify'].append(modify.__name__)
+            debug_result['query_succeed'].append(query.decode('utf-8'))
+            debug_result['index_succeed'].append(index.decode('utf-8'))
+            # Only break, if we have enough matches
+            if len(result['matches']) >= result['count']:
+                break
+        else:
+            result = result_new
+    # for pair in index_modifiers
+    return rc, result
+
+
+
 # ---------------------------------------------------------
 """
 Global searching
@@ -527,114 +586,105 @@ def search():
 
     # 1. Boosted name
     if autocomplete:
-        index_modifiers.append( ('ind_name',
+        index_modifiers.append( ('ind_name_exact',
                 modify_query_autocomplete,
-                'name = 100, alternative_names = 80',
-                'ind_name_exact=3, ind_name_prefix=1',
+                'name = 60000, alternative_names = 30000',
             ) )
-    index_modifiers.append( ('ind_name',
+        index_modifiers.append( ('ind_name_prefix',
+                modify_query_autocomplete,
+                'name = 50000, alternative_names = 25000',
+            ) )
+    index_modifiers.append( ('ind_name_exact',
             modify_query_orig,
-            'name = 100, alternative_names = 80',
-            'ind_name_exact=3, ind_name_prefix=1',
+            'name = 40000, alternative_names = 20000',
         ) )
-    index_modifiers.append( ('ind_name',
+    index_modifiers.append( ('ind_name_prefix',
+            modify_query_orig,
+            'name = 30000, alternative_names = 15000',
+        ) )
+    index_modifiers.append( ('ind_name_exact',
             modify_query_remhouse,
-            'name = 100, alternative_names = 80',
-            'ind_name_exact=3, ind_name_prefix=1',
+            'name = 20000, alternative_names = 10000',
+            '',
             orig_query,
         ) )
+    index_modifiers.append( ('ind_name_prefix',
+            modify_query_remhouse,
+            'name = 10000, alternative_names = 5000',
+            '',
+            orig_query,
+        ) )
+
     # 2. Prefix on names
     if autocomplete:
         index_modifiers.append( ('ind_names_prefix',
                 modify_query_autocomplete,
-                'name = 100, alternative_names = 80, display_name = 1',
+                'name = 4000, alternative_names = 2000, display_name = 400',
             ) )
     index_modifiers.append( ('ind_names_prefix',
             modify_query_orig,
-            'name = 100, alternative_names = 80, display_name = 1',
+            'name = 2000, alternative_names = 1000, display_name = 200',
         ) )
     index_modifiers.append( ('ind_names_prefix',
             modify_query_remhouse,
-            'name = 100, alternative_names = 80, display_name = 1',
+            'name = 1000, alternative_names = 500, display_name = 100',
             '',
             orig_query,
-        ) )
-    # 3. Infix with soundex on names
-    if autocomplete:
-        index_modifiers.append( ('ind_names_infix_soundex',
-                modify_query_autocomplete,
-                'name = 100, alternative_names = 80, display_name = 1',
-            ) )
-    index_modifiers.append( ('ind_names_infix_soundex',
-            modify_query_orig,
-            'name = 100, alternative_names = 80, display_name = 1',
-        ) )
-    index_modifiers.append( ('ind_names_infix_soundex',
-            modify_query_remhouse,
-            'name = 100, alternative_names = 80, display_name = 1',
-            '',
-            orig_query,
-        ) )
-    # 4. We want first to try soundex, then splitor modifier for both index
-    index_modifiers.append( ('ind_names_prefix',
-            modify_query_splitor,
-            'name = 100, alternative_names = 80, display_name = 1',
-        ) )
-    index_modifiers.append( ('ind_names_infix_soundex',
-            modify_query_splitor,
-            'name = 100, alternative_names = 80, display_name = 1',
         ) )
 
     if debug:
         pprint(index_modifiers)
 
-    rc = False
-    result = {}
     debug_result = {}
-    proc_query = orig_query
-    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
-    for pair in index_modifiers:
-        index = pair[0]
-        modify = pair[1]
-        index_weights = ''
-        if len(pair) >= 3:
-            field_weights = pair[2]
-        if len(pair) >= 4:
-            index_weights = pair[3]
-        if len(pair) >= 5:
-            proc_query = pair[4]
-        if debug and index not in times:
-            times[index] = {}
-        # Cycle through few modifications of query
-        # Modification function return query with original query (possibly modified) used for the following processing
-        query, proc_query = modify(proc_query)
-        # No modification has been done
-        if query is None:
-            continue
-        # Process modified query
-        if debug:
-            times['start_query'] = time()
-        rc, result_new = process_query_mysql(index, query, query_filter,
-            start, count, field_weights, index_weights)
-        if debug:
-            times[index][modify.__name__] = time() - times['start_query']
-        if rc and len(result_new['matches']) > 0:
-            # Merge matches with previous result
-            if 'matches' in result and len(result['matches']) > 0:
-                result = mergeResultObject(result, result_new)
-            else:
-                result = result_new.copy()
-                debug_result['modify'] = []
-                debug_result['query_succeed'] = []
-                debug_result['index_succeed'] = []
-            debug_result['modify'].append(modify.__name__)
-            debug_result['query_succeed'].append(query.decode('utf-8'))
-            debug_result['index_succeed'].append(index.decode('utf-8'))
-            # Only break, if we have enough matches
-            if len(result['matches']) >= result['count']:
-                break
+    result = {}
+    # 1. + 2.
+    rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
+        times, query_filter, start, count, debug)
 
-    if rc:
+    if debug:
+        pprint(rc)
+        pprint(result)
+
+    result_first = result
+    # 3. + 4.
+    if not rc or not 'matches' in result or len(result['matches']) == 0:
+        index_modifiers = []
+        # 3. Infix with soundex on names
+        if autocomplete:
+            index_modifiers.append( ('ind_names_infix_soundex',
+                    modify_query_autocomplete,
+                    'name = 400, alternative_names = 200, display_name = 40',
+                ) )
+        index_modifiers.append( ('ind_names_infix_soundex',
+                modify_query_orig,
+                'name = 200, alternative_names = 100, display_name = 20',
+            ) )
+        index_modifiers.append( ('ind_names_infix_soundex',
+                modify_query_remhouse,
+                'name = 100, alternative_names = 50, display_name = 10',
+                '',
+                orig_query,
+            ) )
+        # 4. If no result were found, try splitor modifier on prefix and infix soundex
+        index_modifiers.append( ('ind_names_prefix',
+                modify_query_splitor,
+                'name = 20, alternative_names = 10, display_name = 1',
+            ) )
+        index_modifiers.append( ('ind_names_infix_soundex',
+                modify_query_splitor,
+                'name = 10, alternative_names = 5, display_name = 1',
+            ) )
+        rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
+            times, query_filter, start, count, debug)
+
+    if debug:
+        pprint(rc)
+        pprint(result)
+
+    if 'matches' not in result:
+        result = result_first
+
+    if rc and len(result['matches']) > 0:
         code = 200
 
     data['query'] = orig_query.decode('utf-8')

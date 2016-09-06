@@ -291,9 +291,14 @@ def mergeResultObject(result_old, result_new):
     # Merge matches
     weight_matches = {}
     unique_id = 0
+    unique_ids_list = []
 
     for matches in [result_old['matches'], result_new['matches'], ]:
         for row in matches:
+            if row['id'] in unique_ids_list:
+                result['total_found'] -= 1 # Decrease total found number
+                continue
+            unique_ids_list.append(row['id'])
             weight = str(row['weight'])
             if weight in weight_matches:
                 weight += '_{}'.format(unique_id)

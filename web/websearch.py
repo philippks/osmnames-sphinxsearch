@@ -10,7 +10,6 @@
 # Date: 15.07.2016
 
 from flask import Flask, request, Response, render_template, url_for
-from sphinxapi import *
 from pprint import pprint, pformat
 from json import dumps
 from os import getenv
@@ -34,85 +33,6 @@ if getenv('SEARCH_MAX_COUNT'):
 if getenv('SEARCH_DEFAULT_COUNT'):
     SEARCH_DEFAULT_COUNT = int(getenv('SEARCH_DEFAULT_COUNT'))
 
-
-
-# ---------------------------------------------------------
-"""
-Process query to Sphinx searchd
-"""
-def process_query(index, query, query_filter, start=0, count=0, field_weights='', index_weights=''):
-    # default server configuration
-    host = 'localhost'
-    port = 9312
-    if getenv('WEBSEARCH_SERVER'):
-        host = getenv('WEBSEARCH_SERVER')
-    if getenv('WEBSEARCH_SERVER_PORT'):
-        port = int(getenv('WEBSEARCH_SERVER_PORT'))
-    pprint([host, port, getenv('WEBSEARCH_SERVER')])
-
-    if count == 0:
-        count = SEARCH_DEFAULT_COUNT
-    count = min(SEARCH_MAX_COUNT, count)
-
-    repeat = 3
-    result = None
-    # Repeate 3 times request because of socket.timeout
-    while repeat > 0:
-        try:
-            cl = SphinxClient()
-            cl.SetServer(host, port)
-            cl.SetConnectTimeout(2.0) # float seconds
-            cl.SetLimits(start, count) #offset, limit, maxmatches=0, cutoff=0
-            # cl.SetRankingMode(SPH_RANK_SPH04)
-            # Ranker - SPH04 with boosted exact hit
-            cl.SetRankingMode(SPH_RANK_EXPR, '(sum((4*lcs+2*(min_hit_pos==1)+100*exact_hit)*user_weight)*100+bm25)*importance')
-            # cl.SetMatchMode(SPH_MATCH_EXTENDED2) # default setting
-            cl.SetSortMode(SPH_SORT_EXTENDED, '@relevance DESC, importance DESC')
-            cl.SetFieldWeights({
-                'name': 500,
-                'display_name': 1,
-            })
-
-            # Prepare filter for query, except tags
-            for f in ['class', 'type', 'street', 'city', 'county', 'state',
-                      'country_code', 'country']:
-                if f not in query_filter or query_filter[f] is None:
-                    continue
-                cl.SetFilterString(f, query_filter[f])
-
-            if 'viewbox' in query_filter and query_filter['viewbox'] is not None:
-                bbox = query_filter['viewbox'].split(',')
-                # latitude, south, north
-                lat = [float(bbox[0]), float(bbox[2])]
-                # longtitude, west, east
-                lon = [float(bbox[1]), float(bbox[3])]
-                # Filter on lon lat now
-                cl.SetFilterFloatRange('lon', lon[0], lon[1])
-                cl.SetFilterFloatRange('lat', lat[0], lat[1])
-
-            pprint(query)
-
-            # Process query under index
-            result = cl.Query ( query, index )
-            repeat = 0
-
-        except socket.timeout:
-            repeat -= 1
-
-    status = True
-    if not result:
-        result = {
-            'message': cl.GetLastError(),
-            'total_found': 0,
-            'matches': [],
-        }
-        status = False
-
-    result['count'] = count
-    result['startIndex'] = start
-    result['status'] = status
-
-    return status, result
 
 
 # ---------------------------------------------------------

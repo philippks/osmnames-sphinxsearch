@@ -2,7 +2,8 @@
 
 # cp sample.tsv data/
 
-SOURCE_DIR=/data/osmnames-sphinxsearch
+#SOURCE_DIR=/data/osmnames-sphinxsearch
+SOURCE_DIR=`pwd`
 mkdir -p $SOURCE_DIR/data $SOURCE_DIR/tmp $SOURCE_DIR/log
 sudo rm -rf $SOURCE_DIR/tmp
 

@@ -39,7 +39,7 @@ if getenv('SEARCH_DEFAULT_COUNT'):
 """
 Process query to Sphinx searchd with mysql
 """
-def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights='', index_weights=''):
+def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights=''):
     global SEARCH_MAX_COUNT, SEARCH_DEFAULT_COUNT
     # default server configuration
     host = '127.0.0.1'
@@ -130,8 +130,6 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     option = "retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
     option += ", cutoff = 2000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+10*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
-    if len(index_weights) > 0:
-        option += ", index_weights = ({})".format(index_weights)
     if len(field_weights) > 0:
         option += ", field_weights = ({})".format(field_weights)
     # Prepare query for boost
@@ -384,18 +382,15 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
     rc = False
     result = {}
     proc_query = orig_query
-    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
+    # Pair is (index, modify_function, [field_weights, [orig_query]])
     for pair in index_modifiers:
         index = pair[0]
         modify = pair[1]
         field_weights = ''
-        index_weights = ''
         if len(pair) >= 3:
             field_weights = pair[2]
         if len(pair) >= 4:
-            index_weights = pair[3]
-        if len(pair) >= 5:
-            proc_query = pair[4]
+            proc_query = pair[3]
         if debug and index not in times:
             times[index] = {}
         # Cycle through few modifications of query
@@ -408,7 +403,7 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
         if debug:
             times['start_query'] = time()
         rc, result_new = process_query_mysql(index, query, query_filter,
-            start, count, field_weights, index_weights)
+                start, count, field_weights)
         if debug:
             times[index][modify.__name__] = time() - times['start_query']
         if rc and 'matches' in result_new and len(result_new['matches']) > 0:
@@ -530,13 +525,11 @@ def search():
     index_modifiers.append( ('ind_name_exact',
             modify_query_remhouse,
             'name = 20000, alternative_names = 15000',
-            '',
             orig_query,
         ) )
     index_modifiers.append( ('ind_name_prefix',
             modify_query_remhouse,
             'name = 10000, alternative_names = 9000',
-            '',
             orig_query,
         ) )
 
@@ -553,7 +546,6 @@ def search():
     index_modifiers.append( ('ind_names_prefix',
             modify_query_remhouse,
             'name = 1000, alternative_names = 900, display_name = 100',
-            '',
             orig_query,
         ) )
 
@@ -587,7 +579,6 @@ def search():
         index_modifiers.append( ('ind_names_infix_soundex',
                 modify_query_remhouse,
                 'name = 100, alternative_names = 90, display_name = 10',
-                '',
                 orig_query,
             ) )
         # 4. If no result were found, try splitor modifier on prefix and infix soundex

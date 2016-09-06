@@ -24,7 +24,7 @@
     <th>importance</th>
   </tr>
   <tr>
-    <th colspan="6">wikipedia</th>
+    <th colspan="6">alternative_names<br>wikipedia</th>
     <th colspan="2">place_rank</th>
   </tr>
   {% for row in result['results'] %}
@@ -34,19 +34,25 @@
   {% endif %}
   <tr class="{{ class }}">
     <td rowspan="2">{{ loop.index }}</td>
-    {% for col in ('id', 'name', 'class', 'type', 'boundingbox', 'display_name', 'rank', 'importance', 'wikipedia', 'place_rank') %}
-    {% if col == 'wikipedia' %}
+    {% for col in ('id', 'name', 'class', 'type', 'boundingbox', 'display_name', 'rank', 'importance', 'alternative_names', 'wikipedia', 'place_rank') %}
+    {% if col == 'alternative_names' %}
     </tr>
     <tr class="{{ class }}">
     {% endif %}
-    <td {% if col == 'wikipedia' %}colspan="6"{% elif col == 'place_rank' %}colspan="2"{% endif %}>
+    {% if col != 'wikipedia' %}
+    <td {% if col == 'alternative_names' %}colspan="6"{% elif col == 'place_rank' %}colspan="2"{% endif %}>
+    {% endif %}
     {% if col in row %}
       {{ row[col] }}
       {% if col == 'boundingbox' %}
-      <br>{{ row['lon'] }}, {{ row['lat'] }}
+      <br><i>{{ row['lon'] }}, {{ row['lat'] }}</i>
       {% endif %}
     {% endif %}
+    {% if col == 'alternative_names' %}
+      <br>
+    {% else %}
     </td>
+    {% endif %}
     {% endfor %}
   </tr>
   {% endfor %}
@@ -55,6 +61,7 @@
 <p>Found 0 results for <i>{{query}}</i> in <i>{{index}}</i>:</p>
 <pre>
   {{ result | nl2br | ppretty}}
+  {{debug_result['times'] | ppretty}}
 </pre>
 {% endif %}
 {% endblock %}

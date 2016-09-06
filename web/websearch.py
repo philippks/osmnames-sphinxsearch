@@ -296,7 +296,7 @@ def mergeResultObject(result_old, result_new):
     for matches in [result_old['matches'], result_new['matches'], ]:
         for row in matches:
             if row['id'] in unique_ids_list:
-                result['total_found'] -= 1 # Decrease total found number
+                result_old['total_found'] -= 1 # Decrease total found number
                 continue
             unique_ids_list.append(row['id'])
             weight = str(row['weight'])
@@ -593,29 +593,29 @@ def search():
     if autocomplete:
         index_modifiers.append( ('ind_name_exact',
                 modify_query_autocomplete,
-                'name = 60000, alternative_names = 30000',
+                'name = 60000, alternative_names = 50000',
             ) )
         index_modifiers.append( ('ind_name_prefix',
                 modify_query_autocomplete,
-                'name = 50000, alternative_names = 25000',
+                'name = 50000, alternative_names = 40000',
             ) )
     index_modifiers.append( ('ind_name_exact',
             modify_query_orig,
-            'name = 40000, alternative_names = 20000',
+            'name = 40000, alternative_names = 30000',
         ) )
     index_modifiers.append( ('ind_name_prefix',
             modify_query_orig,
-            'name = 30000, alternative_names = 15000',
+            'name = 30000, alternative_names = 20000',
         ) )
     index_modifiers.append( ('ind_name_exact',
             modify_query_remhouse,
-            'name = 20000, alternative_names = 10000',
+            'name = 20000, alternative_names = 15000',
             '',
             orig_query,
         ) )
     index_modifiers.append( ('ind_name_prefix',
             modify_query_remhouse,
-            'name = 10000, alternative_names = 5000',
+            'name = 10000, alternative_names = 9000',
             '',
             orig_query,
         ) )
@@ -624,15 +624,15 @@ def search():
     if autocomplete:
         index_modifiers.append( ('ind_names_prefix',
                 modify_query_autocomplete,
-                'name = 4000, alternative_names = 2000, display_name = 400',
+                'name = 4000, alternative_names = 3900, display_name = 400',
             ) )
     index_modifiers.append( ('ind_names_prefix',
             modify_query_orig,
-            'name = 2000, alternative_names = 1000, display_name = 200',
+            'name = 2000, alternative_names = 1900, display_name = 200',
         ) )
     index_modifiers.append( ('ind_names_prefix',
             modify_query_remhouse,
-            'name = 1000, alternative_names = 500, display_name = 100',
+            'name = 1000, alternative_names = 900, display_name = 100',
             '',
             orig_query,
         ) )
@@ -658,26 +658,26 @@ def search():
         if autocomplete:
             index_modifiers.append( ('ind_names_infix_soundex',
                     modify_query_autocomplete,
-                    'name = 400, alternative_names = 200, display_name = 40',
+                    'name = 400, alternative_names = 390, display_name = 40',
                 ) )
         index_modifiers.append( ('ind_names_infix_soundex',
                 modify_query_orig,
-                'name = 200, alternative_names = 100, display_name = 20',
+                'name = 200, alternative_names = 190, display_name = 20',
             ) )
         index_modifiers.append( ('ind_names_infix_soundex',
                 modify_query_remhouse,
-                'name = 100, alternative_names = 50, display_name = 10',
+                'name = 100, alternative_names = 90, display_name = 10',
                 '',
                 orig_query,
             ) )
         # 4. If no result were found, try splitor modifier on prefix and infix soundex
         index_modifiers.append( ('ind_names_prefix',
                 modify_query_splitor,
-                'name = 20, alternative_names = 10, display_name = 1',
+                'name = 20, alternative_names = 19, display_name = 1',
             ) )
         index_modifiers.append( ('ind_names_infix_soundex',
                 modify_query_splitor,
-                'name = 10, alternative_names = 5, display_name = 1',
+                'name = 10, alternative_names = 9, display_name = 1',
             ) )
         rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
             times, query_filter, start, count, debug)

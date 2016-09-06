@@ -208,6 +208,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     #  - 'retry_count' - integer (distributed retries count)
     #  - 'retry_delay' - integer (distributed retry delay, msec)
     option = "retry_count = 2, retry_delay = 500, max_matches = 200, max_query_time = 20000"
+    option += ", cutoff = 2000"
     option += ", ranker=expr('sum((10*lcs+5*exact_order+10*exact_hit+5*wlccs)*user_weight)*1000+bm25')"
     if len(index_weights) > 0:
         option += ", index_weights = ({})".format(index_weights)
@@ -218,11 +219,11 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     select_boost = []
     argsBoost = []
     # Boost whole query (street with spaces)
-    select_boost.append('IF(name=%s,1000000,0)')
-    argsBoost.append(re.sub(r"\**", "", query))
+    # select_boost.append('IF(name=%s,1000000,0)')
+    # argsBoost.append(re.sub(r"\**", "", query))
     # Boost each query part delimited by space
     # Only if there is more than 1 query elements
-    if len(query_elements) > 1:
+    if False and len(query_elements) > 1:
         for qe in query_elements:
            select_boost.append('IF(name=%s,1000000,0)')
            argsBoost.append(re.sub(r"\**", "", qe))

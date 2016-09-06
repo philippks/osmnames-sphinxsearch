@@ -562,6 +562,9 @@ def search_url(country_code, query):
     query_filter = {}
 
     if country_code is not None:
+        if len(country_code) > 3:
+            data['result'] = {'message': 'Invalid country code value.'}
+            return formatResponse(data, code)
         query_filter = {'country_code': country_code.encode('utf-8')}
 
     # Common search for query with filters

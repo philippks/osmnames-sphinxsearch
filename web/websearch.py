@@ -59,7 +59,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
             'message': str(ex),
             'status': False,
             'count': 0,
-            'startIndex': start,
+            'start_index': start,
         }
         return False, result
 
@@ -72,7 +72,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
 
     # Prepare filter for query
     for f in ['class', 'type', 'street', 'city', 'county', 'state', 'country_code', 'country']:
-        if query_filter[f] is None:
+        if f not in query_filter or query_filter[f] is None:
             continue
         inList = []
         for val in query_filter[f]:
@@ -98,7 +98,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
 
     sortBy = []
     # Prepare sorting by custom or default
-    if query_filter['sortBy'] is not None:
+    if 'sortBy' in query_filter and query_filter['sortBy'] is not None:
         for attr in query_filter['sortBy']:
             attr = attr.split('-')
             # List of supported sortBy columns - to prevent SQL injection
@@ -160,6 +160,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         'total_found': 0,
         'matches': [],
         'message': None,
+        'start_index': 0,
     }
 
     try:
@@ -194,7 +195,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         result['message'] = str(ex)
 
     result['count'] = count
-    result['startIndex'] = start
+    result['start_index'] = start
     result['status'] = status
     return status, result
 
@@ -249,11 +250,18 @@ def mergeResultObject(result_old, result_new):
 Prepare JSON from pure Result array from SphinxQL
 """
 def prepareResultJson(result, query_filter):
-    from pprint import pprint
+
+    if 'start_index' not in result:
+        result = {
+            'start_index': 0,
+            'count': 0,
+            'total_found': 0,
+            'matches': [],
+        }
 
     response = {
         'results': [],
-        'startIndex': result['startIndex'],
+        'startIndex': result['start_index'],
         'count': result['count'],
         'totalResults': result['total_found'],
     }
@@ -289,10 +297,10 @@ def prepareResultJson(result, query_filter):
         response['results'].append(res)
 
     # Prepare next and previous index
-    nextIndex = result['startIndex'] + result['count']
+    nextIndex = result['start_index'] + result['count']
     if nextIndex <= result['total_found']:
         response['nextIndex'] = nextIndex
-    prevIndex = result['startIndex'] - result['count']
+    prevIndex = result['start_index'] - result['count']
     if prevIndex >= 0:
         response['previousIndex'] = prevIndex
 
@@ -430,71 +438,10 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
 
 # ---------------------------------------------------------
 """
-Global searching
+Common search method
 """
-@app.route('/')
-def search():
-    data = {'query': '', 'route': '/', 'template': 'answer.html'}
-    layout = request.args.get('layout')
-    if layout and layout in ('answer', 'home'):
-        data['template'] = request.args.get('layout') + '.html'
-    code = 400
-
-    q = request.args.get('q')
-    autocomplete = request.args.get('autocomplete')
-    debug = request.args.get('debug')
-    pprint([q, autocomplete, debug])
-
-    times = {}
-    if debug:
-        times['start'] = time()
-
-    query_filter = {
-        'type': None, 'class': None,
-        'street': None, 'city' : None,
-        'county': None, 'state': None,
-        'country': None, 'country_code': None,
-        'viewbox': None,
-        'sortBy': None,
-    }
-    filter = False
-    for f in query_filter:
-        if request.args.get(f):
-            v = None
-            # Some arguments may be list
-            if f in ('type', 'class', 'city', 'county', 'country_code', 'sortBy', 'tags'):
-                vl = request.args.getlist(f)
-                if len(vl) == 1:
-                    v = vl[0].encode('utf-8')
-                    # This argument can be list separated by comma
-                    v = v.split(',')
-                elif len(vl) > 1:
-                    v = [x.encode('utf-8') for x in vl]
-            if v is None:
-                vl = request.args.get(f)
-                v = vl.encode('utf-8')
-            query_filter[f] = v
-            filter = True
-
-    if not q and not filter:
-        # data['result'] = {'error': 'Missing query!'}
-        return render_template('home.html', route='/')
-
-    data['query'] = q.encode('utf-8')
-
-    start = 0
-    count = 0
-    if request.args.get('startIndex'):
-        start = int(request.args.get('startIndex'))
-    if request.args.get('count'):
-        count = int(request.args.get('count'))
-
-    data['url'] = request.url
-
-    orig_query = data['query']
-
-    if debug:
-        times['prepare'] = time() - times['start']
+def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
+        debug=False, times={}, debug_result={}):
 
     # Iterating only over 3 index
     # 1. Boosted prefix+exact on name
@@ -552,8 +499,7 @@ def search():
     if debug:
         pprint(index_modifiers)
 
-    debug_result = {}
-    result = {}
+    result = {'matches':[]}
     # 1. + 2.
     rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
         times, query_filter, start, count, debug)
@@ -600,6 +546,106 @@ def search():
     if 'matches' not in result:
         result = result_first
 
+    return rc, result
+
+
+# ---------------------------------------------------------
+"""
+Autocomplete searching via HTTP URL
+"""
+@app.route('/q/<query>', defaults={'country_code': None})
+@app.route('/<country_code>/q/<path:query>')
+def search_url(country_code, query):
+    autocomplete = True
+    code = 400
+    data = {'query': '', 'route': '/', 'format': 'json'}
+    query_filter = {}
+
+    if country_code is not None:
+        query_filter = {'country_code': country_code.encode('utf-8')}
+
+    # Common search for query with filters
+    rc, result = search(query.encode('utf-8'), query_filter, autocomplete)
+    if rc and len(result['matches']) > 0:
+        code = 200
+
+    data['query'] = query
+    data['result'] = prepareResultJson(result, query_filter)
+
+    return formatResponse(data, code)
+
+
+
+# ---------------------------------------------------------
+"""
+Global searching via HTTP Query
+"""
+@app.route('/')
+def search_query():
+    data = {'query': '', 'route': '/', 'template': 'answer.html'}
+    layout = request.args.get('layout')
+    if layout and layout in ('answer', 'home'):
+        data['template'] = request.args.get('layout') + '.html'
+    code = 400
+
+    q = request.args.get('q')
+    autocomplete = request.args.get('autocomplete')
+    debug = request.args.get('debug')
+    if debug:
+        pprint([q, autocomplete, debug])
+
+    times = {}
+    debug_result = {}
+    if debug:
+        times['start'] = time()
+
+    query_filter = {
+        'type': None, 'class': None,
+        'street': None, 'city' : None,
+        'county': None, 'state': None,
+        'country': None, 'country_code': None,
+        'viewbox': None,
+        'sortBy': None,
+    }
+    filter = False
+    for f in query_filter:
+        if request.args.get(f):
+            v = None
+            # Some arguments may be list
+            if f in ('type', 'class', 'city', 'county', 'country_code', 'sortBy', 'tags'):
+                vl = request.args.getlist(f)
+                if len(vl) == 1:
+                    v = vl[0].encode('utf-8')
+                    # This argument can be list separated by comma
+                    v = v.split(',')
+                elif len(vl) > 1:
+                    v = [x.encode('utf-8') for x in vl]
+            if v is None:
+                vl = request.args.get(f)
+                v = vl.encode('utf-8')
+            query_filter[f] = v
+            filter = True
+
+    if not q and not filter:
+        # data['result'] = {'error': 'Missing query!'}
+        return render_template('home.html', route='/')
+
+    data['url'] = request.url
+    data['query'] = q.encode('utf-8')
+    orig_query = data['query']
+
+    start = 0
+    count = 0
+    if request.args.get('startIndex'):
+        start = int(request.args.get('startIndex'))
+    if request.args.get('count'):
+        count = int(request.args.get('count'))
+
+    if debug:
+        times['prepare'] = time() - times['start']
+
+    # Common search for query with filters
+    rc, result = search(orig_query, query_filter, autocomplete, start, count, debug, times, debug_result)
     if rc and len(result['matches']) > 0:
         code = 200
 
@@ -649,6 +695,9 @@ Custom template filters
 @app.template_filter()
 def ppretty(value):
     return pformat(value)
+
+
+# =============================================================================
 
 """
 Main launcher

@@ -12,13 +12,16 @@
 from flask import Flask, request, Response, render_template, url_for
 from pprint import pprint, pformat
 from json import dumps
-from os import getenv
-from time import time
+from os import getenv, path, utime
+from time import time, mktime
+from datetime import datetime
 import requests
 import sys
 import MySQLdb
 import re
 import natsort
+import rfc822 # Used for parsing RFC822 into datetime
+import email # Used for formatting TS into RFC822
 
 app = Flask(__name__, template_folder='templates/')
 app.debug = not getenv('WEBSEARCH_DEBUG') is None
@@ -33,6 +36,16 @@ if getenv('SEARCH_MAX_COUNT'):
 if getenv('SEARCH_DEFAULT_COUNT'):
     SEARCH_DEFAULT_COUNT = int(getenv('SEARCH_DEFAULT_COUNT'))
 
+TMPFILE_DATA_TIMESTAMP = "/tmp/osmnames-sphinxsearch-data.timestamp"
+
+# Prepare global variable for Last-modified Header
+try:
+    mtime = path.getmtime(TMPFILE_DATA_TIMESTAMP)
+except OSError:
+    with open(TMPFILE_DATA_TIMESTAMP, 'a'):
+        utime(TMPFILE_DATA_TIMESTAMP, None)
+    mtime = time()
+DATA_LAST_MODIFIED = email.utils.formatdate(mtime, usegmt=True)
 
 
 # ---------------------------------------------------------
@@ -166,7 +179,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     try:
         args = argsBoost + argsFilter + [start, count]
         q = cursor.execute(sql, args)
-        pprint([sql, args, cursor._last_executed, q])
+        # pprint([sql, args, cursor._last_executed, q])
         desc = cursor.description
         matches = []
         for row in cursor:
@@ -340,6 +353,7 @@ def formatResponse(data, code=200):
     resp.headers['Access-Control-Allow-Origin'] = '*'
     # Cache results for 4 hours in Web Browsers and 12 hours in CDN caches
     resp.headers['Cache-Control'] = 'public, max-age=14400, s-maxage=43200'
+    resp.headers['Last-Modified'] = DATA_LAST_MODIFIED
     return resp, code
 
 
@@ -549,6 +563,42 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     return rc, result
 
 
+
+# ---------------------------------------------------------
+"""
+Check request header for 'if-modified-since'
+Return True if content wasn't modified (According to the timestamp)
+"""
+def has_modified_header(headers):
+    global DATA_LAST_MODIFIED
+
+    modified = headers.get('if-modified-since')
+    if modified:
+        try:
+            mtime = path.getmtime(TMPFILE_DATA_TIMESTAMP)
+        except OSError:
+            with open(TMPFILE_DATA_TIMESTAMP, 'a'):
+                utime(TMPFILE_DATA_TIMESTAMP, None)
+            mtime = time()
+        DATA_LAST_MODIFIED = email.utils.formatdate(mtime, usegmt=True)
+        # pprint([headers, modified, DATA_LAST_MODIFIED, mtime])
+        # pprint([mtime, rfc822.parsedate(modified), mktime(rfc822.parsedate(modified))])
+        modified_file = datetime.fromtimestamp(mtime)
+        modified_file = modified_file.replace(microsecond = 0)
+        modified_date = datetime.fromtimestamp(mktime(rfc822.parsedate(modified)))
+
+        # pprint([
+        #     'Data: ', modified_file,
+        #     'Header: ', modified_date,
+        #     modified_file <= modified_date,
+        # ])
+        if modified_file <= modified_date:
+            return True
+
+    return False
+
+
+
 # ---------------------------------------------------------
 """
 Autocomplete searching via HTTP URL
@@ -560,6 +610,10 @@ def search_url(country_code, query):
     code = 400
     data = {'query': '', 'route': '/', 'format': 'json'}
     query_filter = {}
+
+    if has_modified_header(request.headers):
+        data['result'] = {}
+        return formatResponse(data, 304)
 
     if country_code is not None:
         if len(country_code) > 3:
@@ -590,6 +644,10 @@ def search_query():
     if layout and layout in ('answer', 'home'):
         data['template'] = request.args.get('layout') + '.html'
     code = 400
+
+    if has_modified_header(request.headers):
+        data['result'] = {}
+        return formatResponse(data, 304)
 
     q = request.args.get('q')
     autocomplete = request.args.get('autocomplete')
@@ -640,9 +698,15 @@ def search_query():
     start = 0
     count = 0
     if request.args.get('startIndex'):
-        start = int(request.args.get('startIndex'))
+        try:
+            start = int(request.args.get('startIndex'))
+        except:
+            pass
     if request.args.get('count'):
-        count = int(request.args.get('count'))
+        try:
+            count = int(request.args.get('count'))
+        except:
+            pass
 
     if debug:
         times['prepare'] = time() - times['start']
@@ -663,7 +727,7 @@ def search_query():
     args = dict(request.args)
     if 'layout' in args:
         del(args['layout'])
-    data['url_home'] = url_for('search', layout='home', **args)
+    data['url_home'] = url_for('search_query', layout='home', **args)
     return formatResponse(data, code)
 
 

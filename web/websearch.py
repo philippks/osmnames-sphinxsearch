@@ -619,7 +619,7 @@ def search_url(country_code, query):
         if len(country_code) > 3:
             data['result'] = {'message': 'Invalid country code value.'}
             return formatResponse(data, code)
-        query_filter = {'country_code': country_code.encode('utf-8')}
+        query_filter = {'country_code': country_code.encode('utf-8').split(',')}
 
     # Common search for query with filters
     rc, result = search(query.encode('utf-8'), query_filter, autocomplete)

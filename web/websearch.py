@@ -604,9 +604,7 @@ def has_modified_header(headers):
 Autocomplete searching via HTTP URL
 """
 @app.route('/q/<query>', defaults={'country_code': None})
-@app.route('/q/<query>.js', defaults={'country_code': None})
 @app.route('/<country_code>/q/<query>')
-@app.route('/<country_code>/q/<query>.js')
 def search_url(country_code, query):
     autocomplete = True
     code = 400
@@ -632,6 +630,13 @@ def search_url(country_code, query):
     data['result'] = prepareResultJson(result, query_filter)
 
     return formatResponse(data, code)
+
+
+# Alias without redirect
+@app.route('/q/<query>.js', defaults={'country_code': None})
+@app.route('/<country_code>/q/<query>.js')
+def search_url_js(country_code, query):
+    return search_url(country_code, query)
 
 
 

@@ -47,13 +47,21 @@ except OSError:
     mtime = time()
 DATA_LAST_MODIFIED = email.utils.formatdate(mtime, usegmt=True)
 
+# Filter attributes values
+# dict[ attribute ] = list(values)
+CHECK_ATTR_FILTER = ['country_code', 'class']
+ATTR_VALUES = {}
+
 
 # ---------------------------------------------------------
 """
-Process query to Sphinx searchd with mysql
+Get attributes distinct values, using data from index
+dict[ attribute ] = list(values)
 """
-def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights=''):
-    global SEARCH_MAX_COUNT, SEARCH_DEFAULT_COUNT
+def get_attributes_values(index, attributes):
+    global ATTR_VALUES
+
+    # connect to the mysql server
     # default server configuration
     host = '127.0.0.1'
     port = 9306
@@ -66,19 +74,79 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         db = MySQLdb.connect(host=host, port=port, user='root')
         cursor = db.cursor()
     except Exception as ex:
-        result = {
-            'total_found': 0,
-            'matches': [],
-            'message': str(ex),
-            'status': False,
-            'count': 0,
-            'start_index': start,
-        }
-        return False, result
+        return False
+
+    # Loop over attributes
+    if isinstance(attributes, str):
+        attributes = [attributes,]
+
+    for attr in attributes:
+        # clear values
+        ATTR_VALUES[attr] = []
+        count = 200
+        total_found = 0
+        # get attributes values for index
+        sqlQuery = 'SELECT {} FROM {} GROUP BY {} LIMIT {}, {}'
+        sqlMeta = 'SHOW META LIKE %s'
+        found = 0
+        try:
+            while total_found == 0 or found < total_found:
+                q = cursor.execute(sqlQuery.format(attr, index, attr, found, count), ())
+                for row in cursor:
+                    found += 1
+                    ATTR_VALUES[attr].append( str(row[0]) )
+                if total_found == 0:
+                    q = cursor.execute(sqlMeta, ('total_found',))
+                    for row in cursor:
+                        total_found = int(row[1])
+                        # Skip this attribute, if total found is more than max_matches
+                        if total_found > 1000:
+                            del(ATTR_VALUES[attr])
+                            found = total_found
+            if found == 0:
+                del(ATTR_VALUES[attr])
+        except Exception as ex:
+            print(str(ex))
+            return False
+    return True
+
+
+
+# ---------------------------------------------------------
+"""
+Process query to Sphinx searchd with mysql
+"""
+def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights=''):
+    # default server configuration
+    host = '127.0.0.1'
+    port = 9306
+    if getenv('WEBSEARCH_SERVER'):
+        host = getenv('WEBSEARCH_SERVER')
+    if getenv('WEBSEARCH_SERVER_PORT'):
+        port = int(getenv('WEBSEARCH_SERVER_PORT'))
 
     if count == 0:
         count = SEARCH_DEFAULT_COUNT
     count = min(SEARCH_MAX_COUNT, count)
+
+    status = True
+    result = {
+        'total_found': 0,
+        'matches': [],
+        'message': None,
+        'start_index': start,
+        'count': count,
+        'status': status,
+    }
+
+    try:
+        db = MySQLdb.connect(host=host, port=port, user='root')
+        cursor = db.cursor()
+    except Exception as ex:
+        status = False
+        result['message'] = str(ex)
+        result['status'] = status
+        return status, result
 
     argsFilter = []
     whereFilter = []
@@ -89,6 +157,11 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
             continue
         inList = []
         for val in query_filter[f]:
+            if f in ATTR_VALUES and val not in ATTR_VALUES[f]:
+                status = False
+                result['message'] = 'Invalid attribute value.'
+                result['status'] = status
+                return status, result
             argsFilter.append(val)
             inList.append('%s')
         # Creates where condition: f in (%s, %s, %s...)
@@ -168,14 +241,6 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         option
     )
 
-    status = True
-    result = {
-        'total_found': 0,
-        'matches': [],
-        'message': None,
-        'start_index': 0,
-    }
-
     try:
         args = argsBoost + argsFilter + [start, count]
         q = cursor.execute(sql, args)
@@ -207,8 +272,6 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         status = False
         result['message'] = str(ex)
 
-    result['count'] = count
-    result['start_index'] = start
     result['status'] = status
     return status, result
 
@@ -574,6 +637,7 @@ def has_modified_header(headers):
 
     modified = headers.get('if-modified-since')
     if modified:
+        oldLastModified = DATA_LAST_MODIFIED
         try:
             mtime = path.getmtime(TMPFILE_DATA_TIMESTAMP)
         except OSError:
@@ -581,6 +645,9 @@ def has_modified_header(headers):
                 utime(TMPFILE_DATA_TIMESTAMP, None)
             mtime = time()
         DATA_LAST_MODIFIED = email.utils.formatdate(mtime, usegmt=True)
+        if DATA_LAST_MODIFIED != oldLastModified:
+            # reload attributes if index changed
+            get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
         # pprint([headers, modified, DATA_LAST_MODIFIED, mtime])
         # pprint([mtime, rfc822.parsedate(modified), mktime(rfc822.parsedate(modified))])
         modified_file = datetime.fromtimestamp(mtime)
@@ -738,15 +805,6 @@ def search_query():
     return formatResponse(data, code)
 
 
-# ---------------------------------------------------------
-"""
-Homepage (content only for debug)
-"""
-# @app.route('/')
-# def home():
-#     return render_template('home.html', route='/search')
-
-
 
 # ---------------------------------------------------------
 """
@@ -763,6 +821,7 @@ def nl2br(value):
     else:
         return value
 
+
 """
 Custom template filters
 """
@@ -771,7 +830,12 @@ def ppretty(value):
     return pformat(value)
 
 
+
 # =============================================================================
+
+# Load attributes at runtime
+get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
+pprint(ATTR_VALUES)
 
 """
 Main launcher

@@ -385,6 +385,40 @@ def prepareResultJson(result, query_filter):
 
 
 # ---------------------------------------------------------
+
+"""
+Parse and prepare name_suffix based on results
+"""
+def prepareNameSuffix(results):
+
+    counts = {'country_code': [], 'state': [], 'city': []}
+
+    # Separate different country codes
+    for row in results:
+        for field in ['country_code', 'state', 'city']:
+            if row[field] in counts[field]:
+                continue
+            # Skip states for not-US
+            if row['country_code'] != 'us' and field == 'state':
+                continue
+            counts[field].append(row[field])
+
+    # Prepare name suffix based on counts
+    newresults = []
+    for row in results:
+        name_suffix = []
+        if row['type'] != 'city' and len(counts['city']) > 0 and len(row['city']) > 0:
+            name_suffix.append(row['city'])
+        if row['country_code'] == 'us' and len(counts['state']) > 0 and len(row['state']) > 0:
+            name_suffix.append(row['state'])
+        if len(counts['country_code']) > 0:
+            name_suffix.append(row['country_code'])
+        row['name_suffix'] = ', '.join(name_suffix)
+        newresults.append(row)
+
+    return newresults
+
+
 """
 Format response output
 """
@@ -789,6 +823,7 @@ def search_query():
     rc, result = search(orig_query, query_filter, autocomplete, start, count, debug, times, debug_result)
     if rc and len(result['matches']) > 0:
         code = 200
+        result['matches'] = prepareNameSuffix(result['matches'])
 
     data['query'] = orig_query.decode('utf-8')
     if debug:

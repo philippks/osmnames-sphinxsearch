@@ -43,7 +43,11 @@
     <td {% if col == 'alternative_names' %}colspan="6"{% elif col == 'place_rank' %}colspan="2"{% endif %}>
     {% endif %}
     {% if col in row %}
-      {{ row[col] }}
+      {% if col == 'display_name' and 'name_suffix' in row and row['name_suffix'] %}
+        {{row['name']}}, {{row['name_suffix']}}
+      {% else %}
+        {{ row[col] }}
+      {% endif %}
       {% if col == 'boundingbox' %}
       <br><i>{{ row['lon'] }}, {{ row['lat'] }}</i>
       {% endif %}

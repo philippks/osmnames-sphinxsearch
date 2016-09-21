@@ -407,12 +407,12 @@ def prepareNameSuffix(results):
     newresults = []
     for row in results:
         name_suffix = []
-        if row['type'] != 'city' and len(counts['city']) > 0 and len(row['city']) > 0:
+        if row['type'] != 'city' and len(counts['city']) > 1 and len(row['city']) > 0:
             name_suffix.append(row['city'])
-        if row['country_code'] == 'us' and len(counts['state']) > 0 and len(row['state']) > 0:
+        if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
             name_suffix.append(row['state'])
-        if len(counts['country_code']) > 0:
-            name_suffix.append(row['country_code'])
+        if len(counts['country_code']) > 1:
+            name_suffix.append(row['country_code'].upper())
         row['name_suffix'] = ', '.join(name_suffix)
         newresults.append(row)
 
@@ -823,13 +823,14 @@ def search_query():
     rc, result = search(orig_query, query_filter, autocomplete, start, count, debug, times, debug_result)
     if rc and len(result['matches']) > 0:
         code = 200
-        result['matches'] = prepareNameSuffix(result['matches'])
 
     data['query'] = orig_query.decode('utf-8')
     if debug:
         times['process'] = time() - times['start']
         debug_result['times'] = times
     data['result'] = prepareResultJson(result, query_filter)
+    if len(data['result']['results']) > 0 :
+        data['result']['results'] = prepareNameSuffix(data['result']['results'])
     data['debug_result'] = debug_result
     data['autocomplete'] = autocomplete
     data['debug'] = debug

@@ -10,7 +10,7 @@
 # Date: 15.07.2016
 
 from flask import Flask, request, Response, render_template, url_for
-from pprint import pprint, pformat
+from pprint import pprint, pformat, PrettyPrinter
 from json import dumps
 from os import getenv, path, utime
 from time import time, mktime
@@ -842,8 +842,15 @@ def search_query():
 
 
 # ---------------------------------------------------------
+
+class MyPrettyPrinter(PrettyPrinter):
+    def format(self, object, context, maxlevels, level):
+        if isinstance(object, unicode):
+            return ('"'+object.encode('utf-8')+'"', True, False)
+        return PrettyPrinter.format(self, object, context, maxlevels, level)
+
 """
-Custom template filters
+Custom template filter - nl2br
 """
 @app.template_filter()
 def nl2br(value):
@@ -858,11 +865,11 @@ def nl2br(value):
 
 
 """
-Custom template filters
+Custom template filter - ppretty
 """
 @app.template_filter()
 def ppretty(value):
-    return pformat(value)
+    return MyPrettyPrinter().pformat(value).decode('utf-8')
 
 
 

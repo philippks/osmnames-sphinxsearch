@@ -50,6 +50,8 @@
     {% endif %}
     {% if col == 'alternative_names' %}
       <br>
+    {% elif col =='wikipedia' and 'times' in debug_result %}
+      <br><span style="font-family: monospace;">{{row | ppretty}}</span>
     {% else %}
     </td>
     {% endif %}

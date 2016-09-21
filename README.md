@@ -7,12 +7,12 @@ Using data from https://github.com/geometalab/OSMNames - Database of geographic 
 
 # REST API
 
-## Search for autocomplete: `/q/<query>`.js
+## Search for autocomplete: `/q/<query>.js`
 
 This endpoint returns 20 results matching the `<query>`.
 
 
-## Country specific search for autocomplte `/<country_code>/q/<query>`.js
+## Country specific search for autocomplete `/<country_code>/q/<query>.js`
 
 This endpoint returns 20 results matching the `<query>` within a specific country, identified by the `<country_code` (lowercase ISO 3166 Alpha-2 code).
 
@@ -65,24 +65,35 @@ docker run -d --name klokantech-osmnames-sphinxsearch -p 80:80 klokantech/osmnam
 You can attach your file `data.tsv`, which has to be located in the internal path `/data/input/data.tsv`:
 
 ```
-docker run -d --name klokantech-osmnames-sphinxsearch -v /path/to/folder/data.tsv:/data/input/ -p 80:80 klokantech/osmnames-sphinxsearch
+docker run -d --name klokantech-osmnames-sphinxsearch \
+    -v /path/to/folder/data.tsv:/data/input/ \
+    -p 80:80 \
+    klokantech/osmnames-sphinxsearch
 ```
 
 This file will be indexed on the first run, or if index files are missing.
 You can specify path for index folder as well:
 
 ```
-docker run -d --name klokantech-osmnames-sphinxsearch -v /path/to/index/folder/:/data/index/ -v /path/to/data/folder/:/data/input/ -p 80:80 klokantech/osmnames-sphinxsearch
+docker run -d --name klokantech-osmnames-sphinxsearch \
+    -v /path/to/index/folder/:/data/index/ \
+    -v /path/to/data/folder/:/data/input/ \
+    -p 80:80 \
+    klokantech/osmnames-sphinxsearch
 ```
 
 You can attach your path with the following folder structure directly with easier command:
 
 ```
 /path/to/folder/
-  input/data.tsv
-  index/
+    - input/
+        - data.tsv
+    - index/
 ```
 
 ```
-docker run -d --name klokantech-osmnames-sphinxsearch -v /path/to/folder/:/data/ -p 80:80 klokantech/osmnames-sphinxsearch
+docker run -d --name klokantech-osmnames-sphinxsearch \
+    -v /path/to/folder/:/data/ \
+    -p 80:80 \
+    klokantech/osmnames-sphinxsearch
 ```

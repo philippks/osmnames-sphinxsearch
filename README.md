@@ -71,7 +71,8 @@ docker run -d --name klokantech-osmnames-sphinxsearch \
     klokantech/osmnames-sphinxsearch
 ```
 
-This file will be indexed on the first run, or if index files are missing.
+This file will be indexed on the first run or if index files are missing.
+
 You can specify path for index folder as well:
 
 ```
@@ -82,7 +83,7 @@ docker run -d --name klokantech-osmnames-sphinxsearch \
     klokantech/osmnames-sphinxsearch
 ```
 
-You can attach your path with the following folder structure directly with easier command:
+You can attach your path with the following folder structure:
 
 ```
 /path/to/folder/
@@ -91,9 +92,8 @@ You can attach your path with the following folder structure directly with easie
     - index/
 ```
 
+directly with simple command:
+
 ```
-docker run -d --name klokantech-osmnames-sphinxsearch \
-    -v /path/to/folder/:/data/ \
-    -p 80:80 \
-    klokantech/osmnames-sphinxsearch
+docker run -d -v /path/to/folder/:/data/ -p 80:80 klokantech/osmnames-sphinxsearch
 ```

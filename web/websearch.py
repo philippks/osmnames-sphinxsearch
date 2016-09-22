@@ -428,7 +428,7 @@ def prepareNameSuffix(results):
 
     # Separate different country codes
     for row in results:
-        for field in ['country_code', 'state', 'city']:
+        for field in counts.keys():
             if row[field] in counts[field]:
                 continue
             # Skip states for not-US
@@ -443,7 +443,7 @@ def prepareNameSuffix(results):
         if not row['city']:
             row = parseDisplayName(row)
 
-        if row['type'] != 'city' and len(row['city']) > 0 \
+        if row['type'] != 'city' and len(row['city']) > 0 and row['name'] != row['city'] \
             and (len(counts['city']) > 1 or len(counts['name']) > 1):
             name_suffix.append(row['city'])
         if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:

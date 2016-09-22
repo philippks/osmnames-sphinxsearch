@@ -391,12 +391,35 @@ def prepareResultJson(result, query_filter):
 
 # ---------------------------------------------------------
 
+def parseDisplayName(row):
+    #commas = row['display_name'].count(',')
+    parts = row['display_name'].split(', ')
+    newrow = {}
+    if len(parts) == 5:
+        newrow['city'] = parts[1]
+        newrow['state'] = parts[3]
+        newrow['country'] = parts[4]
+    if len(parts) == 6:
+        newrow['city'] = parts[1]
+        newrow['state'] = parts[4]
+        newrow['county'] = parts[4]
+        newrow['country'] = parts[5]
+
+    for field in newrow:
+        if field not in row:
+            row[field] = newrow[field]
+        if not row[field]:
+            row[field] = newrow[field]
+
+    return row
+
+
 """
 Parse and prepare name_suffix based on results
 """
 def prepareNameSuffix(results):
 
-    counts = {'country_code': [], 'state': [], 'city': []}
+    counts = {'country_code': [], 'state': [], 'city': [], 'name': []}
 
     # Separate different country codes
     for row in results:
@@ -412,7 +435,11 @@ def prepareNameSuffix(results):
     newresults = []
     for row in results:
         name_suffix = []
-        if row['type'] != 'city' and len(counts['city']) > 1 and len(row['city']) > 0:
+        if not row['city']:
+            row = parseDisplayName(row)
+
+        if row['type'] != 'city' and len(row['city']) > 0 \
+            and (len(counts['city']) > 1 or len(counts['name']) > 1):
             name_suffix.append(row['city'])
         if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
             name_suffix.append(row['state'])
@@ -734,6 +761,8 @@ def search_url(country_code, query):
 
     data['query'] = query
     data['result'] = prepareResultJson(result, query_filter)
+    if len(data['result']['results']) > 0 :
+        data['result']['results'] = prepareNameSuffix(data['result']['results'])
 
     return formatResponse(data, code)
 

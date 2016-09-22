@@ -9,8 +9,8 @@
 # Author: Martin Mikita (martin.mikita @ klokantech.com)
 # Date: 15.07.2016
 
-from flask import Flask, request, Response, render_template, url_for
-from pprint import pprint, pformat
+from flask import Flask, request, Response, render_template, url_for, redirect
+from pprint import pprint, pformat, PrettyPrinter
 from json import dumps
 from os import getenv, path, utime
 from time import time, mktime
@@ -37,6 +37,10 @@ if getenv('SEARCH_DEFAULT_COUNT'):
     SEARCH_DEFAULT_COUNT = int(getenv('SEARCH_DEFAULT_COUNT'))
 
 TMPFILE_DATA_TIMESTAMP = "/tmp/osmnames-sphinxsearch-data.timestamp"
+
+NOCACHEREDIRECT = False
+if getenv('NOCACHEREDIRECT'):
+    NOCACHEREDIRECT = getenv('NOCACHEREDIRECT')
 
 # Prepare global variable for Last-modified Header
 try:
@@ -74,6 +78,7 @@ def get_attributes_values(index, attributes):
         db = MySQLdb.connect(host=host, port=port, user='root')
         cursor = db.cursor()
     except Exception as ex:
+        print(str(ex))
         return False
 
     # Loop over attributes
@@ -109,6 +114,11 @@ def get_attributes_values(index, attributes):
             print(str(ex))
             return False
     return True
+
+
+# Load attributes at runtime
+get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
+pprint(ATTR_VALUES)
 
 
 
@@ -385,6 +395,67 @@ def prepareResultJson(result, query_filter):
 
 
 # ---------------------------------------------------------
+
+def parseDisplayName(row):
+    #commas = row['display_name'].count(',')
+    parts = row['display_name'].split(', ')
+    newrow = {}
+    if len(parts) == 5:
+        newrow['city'] = parts[1]
+        newrow['state'] = parts[3]
+        newrow['country'] = parts[4]
+    if len(parts) == 6:
+        newrow['city'] = parts[1]
+        newrow['state'] = parts[4]
+        newrow['county'] = parts[4]
+        newrow['country'] = parts[5]
+
+    for field in newrow:
+        if field not in row:
+            row[field] = newrow[field]
+        if not row[field]:
+            row[field] = newrow[field]
+
+    return row
+
+
+"""
+Parse and prepare name_suffix based on results
+"""
+def prepareNameSuffix(results):
+
+    counts = {'country_code': [], 'state': [], 'city': [], 'name': []}
+
+    # Separate different country codes
+    for row in results:
+        for field in counts.keys():
+            if row[field] in counts[field]:
+                continue
+            # Skip states for not-US
+            if row['country_code'] != 'us' and field == 'state':
+                continue
+            counts[field].append(row[field])
+
+    # Prepare name suffix based on counts
+    newresults = []
+    for row in results:
+        name_suffix = []
+        if not row['city']:
+            row = parseDisplayName(row)
+
+        if row['type'] != 'city' and len(row['city']) > 0 and row['name'] != row['city'] \
+            and (len(counts['city']) > 1 or len(counts['name']) > 1):
+            name_suffix.append(row['city'])
+        if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
+            name_suffix.append(row['state'])
+        if len(counts['country_code']) > 1:
+            name_suffix.append(row['country_code'].upper())
+        row['name_suffix'] = ', '.join(name_suffix)
+        newresults.append(row)
+
+    return newresults
+
+
 """
 Format response output
 """
@@ -670,8 +741,8 @@ def has_modified_header(headers):
 """
 Autocomplete searching via HTTP URL
 """
-@app.route('/q/<query>', defaults={'country_code': None})
-@app.route('/<country_code>/q/<query>')
+@app.route('/q/<query>.js', defaults={'country_code': None})
+@app.route('/<country_code>/q/<query>.js')
 def search_url(country_code, query):
     autocomplete = True
     code = 400
@@ -695,14 +766,19 @@ def search_url(country_code, query):
 
     data['query'] = query
     data['result'] = prepareResultJson(result, query_filter)
+    if len(data['result']['results']) > 0 :
+        data['result']['results'] = prepareNameSuffix(data['result']['results'])
 
     return formatResponse(data, code)
 
 
 # Alias without redirect
-@app.route('/q/<query>.js', defaults={'country_code': None})
-@app.route('/<country_code>/q/<query>.js')
+@app.route('/q/<query>', defaults={'country_code': None})
+@app.route('/<country_code>/q/<query>')
 def search_url_js(country_code, query):
+    if NOCACHEREDIRECT:
+        return redirect(NOCACHEREDIRECT, code=302)
+
     return search_url(country_code, query)
 
 
@@ -713,6 +789,10 @@ Global searching via HTTP Query
 """
 @app.route('/')
 def search_query():
+
+    if NOCACHEREDIRECT:
+        return redirect(NOCACHEREDIRECT, code=302)
+
     data = {'query': '', 'route': '/', 'template': 'answer.html'}
     layout = request.args.get('layout')
     if layout and layout in ('answer', 'home'):
@@ -795,6 +875,8 @@ def search_query():
         times['process'] = time() - times['start']
         debug_result['times'] = times
     data['result'] = prepareResultJson(result, query_filter)
+    if len(data['result']['results']) > 0 :
+        data['result']['results'] = prepareNameSuffix(data['result']['results'])
     data['debug_result'] = debug_result
     data['autocomplete'] = autocomplete
     data['debug'] = debug
@@ -807,8 +889,15 @@ def search_query():
 
 
 # ---------------------------------------------------------
+
+class MyPrettyPrinter(PrettyPrinter):
+    def format(self, object, context, maxlevels, level):
+        if isinstance(object, unicode):
+            return ('"'+object.encode('utf-8')+'"', True, False)
+        return PrettyPrinter.format(self, object, context, maxlevels, level)
+
 """
-Custom template filters
+Custom template filter - nl2br
 """
 @app.template_filter()
 def nl2br(value):
@@ -823,19 +912,15 @@ def nl2br(value):
 
 
 """
-Custom template filters
+Custom template filter - ppretty
 """
 @app.template_filter()
 def ppretty(value):
-    return pformat(value)
+    return MyPrettyPrinter().pformat(value).decode('utf-8')
 
 
 
 # =============================================================================
-
-# Load attributes at runtime
-get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
-pprint(ATTR_VALUES)
 
 """
 Main launcher

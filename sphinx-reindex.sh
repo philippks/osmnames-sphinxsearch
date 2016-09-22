@@ -9,9 +9,12 @@ if [ ! -f /data/input/data.tsv ]; then
 fi
 
 # Index files, only if not exists, or forced by the script
-if [ ! -f /data/index/ind_name_prefix.spa -o "$1" = "force" ]; then
+if [ ! -f /data/index/ind_name_prefix_0.spa -o "$1" = "force" ]; then
     mkdir -p /data/index/
+    set +e
     /usr/bin/indexer -c /etc/sphinxsearch/sphinx.conf --rotate --all
+    rc=$? && [ $rc -eq 1 ] && exit $rc
+    set -e
     touch /tmp/osmnames-sphinxsearch-data.timestamp
 fi
 

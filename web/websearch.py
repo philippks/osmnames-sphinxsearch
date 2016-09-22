@@ -9,7 +9,7 @@
 # Author: Martin Mikita (martin.mikita @ klokantech.com)
 # Date: 15.07.2016
 
-from flask import Flask, request, Response, render_template, url_for
+from flask import Flask, request, Response, render_template, url_for, redirect
 from pprint import pprint, pformat, PrettyPrinter
 from json import dumps
 from os import getenv, path, utime
@@ -37,6 +37,10 @@ if getenv('SEARCH_DEFAULT_COUNT'):
     SEARCH_DEFAULT_COUNT = int(getenv('SEARCH_DEFAULT_COUNT'))
 
 TMPFILE_DATA_TIMESTAMP = "/tmp/osmnames-sphinxsearch-data.timestamp"
+
+NOCACHEREDIRECT = False
+if getenv('NOCACHEREDIRECT'):
+    NOCACHEREDIRECT = getenv('NOCACHEREDIRECT')
 
 # Prepare global variable for Last-modified Header
 try:
@@ -74,6 +78,7 @@ def get_attributes_values(index, attributes):
         db = MySQLdb.connect(host=host, port=port, user='root')
         cursor = db.cursor()
     except Exception as ex:
+        print(str(ex))
         return False
 
     # Loop over attributes
@@ -704,8 +709,8 @@ def has_modified_header(headers):
 """
 Autocomplete searching via HTTP URL
 """
-@app.route('/q/<query>', defaults={'country_code': None})
-@app.route('/<country_code>/q/<query>')
+@app.route('/q/<query>.js', defaults={'country_code': None})
+@app.route('/<country_code>/q/<query>.js')
 def search_url(country_code, query):
     autocomplete = True
     code = 400
@@ -734,9 +739,12 @@ def search_url(country_code, query):
 
 
 # Alias without redirect
-@app.route('/q/<query>.js', defaults={'country_code': None})
-@app.route('/<country_code>/q/<query>.js')
+@app.route('/q/<query>', defaults={'country_code': None})
+@app.route('/<country_code>/q/<query>')
 def search_url_js(country_code, query):
+    if NOCACHEREDIRECT:
+        return redirect(NOCACHEREDIRECT, code=302)
+
     return search_url(country_code, query)
 
 
@@ -747,6 +755,10 @@ Global searching via HTTP Query
 """
 @app.route('/')
 def search_query():
+
+    if NOCACHEREDIRECT:
+        return redirect(NOCACHEREDIRECT, code=302)
+
     data = {'query': '', 'route': '/', 'template': 'answer.html'}
     layout = request.args.get('layout')
     if layout and layout in ('answer', 'home'):

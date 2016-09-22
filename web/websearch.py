@@ -116,6 +116,11 @@ def get_attributes_values(index, attributes):
     return True
 
 
+# Load attributes at runtime
+get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
+pprint(ATTR_VALUES)
+
+
 
 # ---------------------------------------------------------
 """
@@ -916,10 +921,6 @@ def ppretty(value):
 
 
 # =============================================================================
-
-# Load attributes at runtime
-get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
-pprint(ATTR_VALUES)
 
 """
 Main launcher

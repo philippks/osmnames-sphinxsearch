@@ -2,10 +2,12 @@
 
 set -e
 
-# Copy sample file if missing
-if [ ! -f /data/input/data.tsv ]; then
+# Download sample 100k file if missing
+if [ ! -f /data/input/data.tsv -a ! -f /data/input/data.tsv.gz ]; then
     mkdir -p /data/input/
-    cp /sample.tsv /data/input/data.tsv
+    curl -L -s https://github.com/OSMNames/OSMNames/releases/download/v1.1/planet-latest-100k.tsv.gz \
+        -o /data/input/planet-latest-100k.tsv.gz
+    ln /data/input/planet-latest-100k.tsv.gz /data/input/data.tsv.gz
 fi
 
 # Index files, only if not exists, or forced by the script

@@ -37,7 +37,6 @@ COPY conf/nginx/nginx.conf /etc/nginx/sites-available/default
 COPY supervisor/*.conf /etc/supervisor/conf.d/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY web /usr/local/src/websearch
-COPY sample.tsv /
 COPY sphinx-reindex.sh /
 
 ENV SPHINX_PORT=9312 \

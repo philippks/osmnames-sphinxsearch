@@ -16,6 +16,9 @@ This endpoint returns 20 results matching the `<query>`.
 
 This endpoint returns 20 results matching the `<query>` within a specific country, identified by the `<country_code` (lowercase ISO 3166 Alpha-2 code).
 
+## Place lookup search: `/r/<longitude>/<latitude>`
+
+This endpoint returns 1 result matching the shortest distance from [longitude,latitude] to places in the data set.
 
 # Input data.tsv format
 
@@ -48,17 +51,16 @@ wikidata
 wikipedia
 ```
 
-The source data should be **sorted by the column `importance`**.
+The source data should be **sorted by the column `importance`**, and include a header row.
 For the description of these columns, see [data format in geometalab/OSMNames repository](https://github.com/geometalab/OSMNames#data-format-of-tsv-export-of-osmnames).
 
+If no data is specified then a 100k OSMNames sample is automatically downloaded from from [geometalab/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v1.1)
 
 # Usage of docker image
 
-This docker image consists from internaly connected and setup OSMNames Websearch (REST API), SphinxSearch and nginx.
+This docker image consists of our OSMNames Websearch (REST API), SphinxSearch and nginx.
 
-Whole service can be run from command-line with one command:
-
-Run with demo data (sample of 100k lines from [geometalab/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v1.1)) only
+The whole service can be run from command-line with one command:
 
 ```
 docker run -d --name klokantech-osmnames-sphinxsearch -p 80:80 klokantech/osmnames-sphinxsearch
@@ -102,12 +104,12 @@ docker run -d -v /path/to/folder/:/data/ -p 80:80 klokantech/osmnames-sphinxsear
 
 # Index storage space
 
-The service for full-text search SphinxSearch requires indexing a source data.
-The index operation is required only for the first time or if source data has been changed.
+The SphinxSearch full-text search service requires indexing of the source data.
+The index operation is required only for the first time or if the source data has been changed.
 This operation takes longer on a source with more lines, and requires more space storage as well.
 
-A demo sample data with 100 000 lines has **9.3 MiB gzip**-ed source data file and requires storage space of **133.8 MiB for the index** folder. The operation tooks in an average 15 seconds.
+A demo sample data with 100 000 lines has **9.3 MiB gzip**-ed source data file and requires storage space of **133.8 MiB for the index** folder. The operation takes (on average) 15 seconds.
 
-The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v1.1/planet-latest.tsv.gz) with 21 million lines requires storage space of **27.4 GiB for the index** folder. The operation tooks in an average 48 minutes.
+The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v1.1/planet-latest.tsv.gz) with 21 million lines requires storage space of **27.4 GiB for the index** folder. The operation takes (on average) 48 minutes.
 
-The index operation is done automatically if certain the index file is missing via the prepared script `sphinx-reindex.sh`. You can use this script to force index operation as well: `$ time bash sphinx-reindex.sh force`.
+The indexing is done automatically (if a particular index file is missing) via the `sphinx-reindex.sh` script. You can use this script to force run the index operation as well: `$ time bash sphinx-reindex.sh force`.

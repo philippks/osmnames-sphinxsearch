@@ -940,10 +940,11 @@ def reverse_search(lon,lat,debug):
     }
 
     if debug:
-        result['debug'] = {}
-        result['debug']['longitude'] = lon
-        result['debug']['latitude'] = lat
-        result['debug']['queries'] = []
+        result['debug'] = {
+        	'longitude' : lon,
+        	'latitude' : lat,
+        	'queries' : []
+        }
 
     #SphinxSearch connection details
     host = '127.0.0.1'
@@ -977,107 +978,72 @@ def reverse_search(lon,lat,debug):
         lat_max = max(min(lat_max,90.0),-90.0)
 
         #we use the built-in GEODIST function to calculate distance
-        select = "SELECT *, GEODIST("+str(lat)+","+str(lon)+",lat,lon,{in=degrees, out=meters}) as distance \
-                     FROM ind_name_exact "
+        select = "SELECT *, GEODIST("+str(lat)+","+str(lon)+",lat,lon,{in=degrees, out=meters}) as distance FROM ind_name_exact WHERE "
 
-        # Handle 180 meridian
+        """
+        SphinxQL does not support the OR operator or the NOT BETWEEN syntax so the only
+        viable approach is to use 2 queries with different longitude conditions for
+        180 meridan spanning cases
+        """
+
+        wherelon = []
+
         if (lon_min < -180.0):
-            """
-            SphinxQL does not support the OR operator
-            or the NOT BETWEEN syntax so the only
-            viable approach is to use 2 queries
 
-            However we still set the sql variable and use this
-            for debug output purposes
-            """
+            wherelon.append("lon BETWEEN {} AND 180.0 ".format(360.0+lon_min))
 
-            where = "WHERE ((lon BETWEEN {} AND 180.0) \
-                       OR  (lon BETWEEN -180.0 AND {})) ".format(360.0+lon_min, lon_max)
-
-            where1 = "WHERE lon BETWEEN {} AND 180.0 ".format(360.0+lon_min)
-
-            where2 = "WHERE lon BETWEEN -180.0 AND {} ".format(lon_max)
+            wherelon.append("lon BETWEEN -180.0 AND {} ".format(lon_max))
 
         elif (lon_max > 180.0):
-            """
-            SphinxQL does not support the OR operator
-            or the NOT BETWEEN syntax so the only
-            viable approach is to use 2 queries
 
-            However we still set the sql variable and use this
-            for debug output purposes
-            """
+            wherelon.append("lon BETWEEN {} AND 180.0 ".format(lon_min))
 
-            where = "WHERE ((lon BETWEEN {} AND 180.0) \
-                       OR  (lon BETWEEN -180.0 AND {})) ".format(lon_min, -360.0+lon_max)
-
-            where1 = "WHERE lon BETWEEN {} AND 180.0 ".format(lon_min)
-
-            where2 = "WHERE lon BETWEEN -180.0 AND {} ".format(-360.0+lon_max)
+            wherelon.append("lon BETWEEN -180.0 AND {} ".format(-360.0+lon_max))
 
         else:
-            #normal case
-            where = "WHERE lon BETWEEN {} AND {} ".format(lon_min, lon_max)
-            where1 = ""
-            where2 = ""
+            wherelon.append("lon BETWEEN {} AND {} ".format(lon_min, lon_max))
 
-        #latitude condition is fixed
-        wherelat = "AND lat BETWEEN {} AND {} AND class='place'".format(lat_min, lat_max)
+        #latitude condition is the same for all cases
+        wherelat = "lat BETWEEN {} AND {}".format(lat_min, lat_max)
+
+        #we only consider places in the data set
+        whereclass = "class='place'"
 
         #limit the result set to the single closest match
         limit = " ORDER BY distance ASC LIMIT 1"
 
-        #form the final query/queries
-        sql = select + where + wherelat + limit
-        if not(where1 == ""):
-            sql1 = select + where1 + wherelat + limit
-        else:
-            sql1 = ""
-        if not(where2 == ""):
-            sql2 = select + where2 + wherelat + limit
-        else:
-            sql2 = ""
+        matches = []
+        desc = None
 
-        if debug:
-            result['debug']['queries'].append(sql)
+        #form the final queries and execute
+        for i in range(len(wherelon)):
+            sql = select + " AND ".join([wherelon[i], wherelat, whereclass]) + limit
 
-        #execute the query/queries
-        if(sql1 == "" and sql2 == ""):
-            #normal case
+            if debug:
+                result['debug']['queries'].append(sql)
+
             curs.execute(sql)
-            desc = curs.description
             rows = curs.fetchall()
-        else:
-            #180 meridian spanning case
-            curs.execute(sql1)
-            rows1 = curs.fetchall()
-            if (len(rows1) > 0):
-                #cursor description only
-                #complete if results returned
-                desc = curs.description
-            curs.execute(sql2)
-            rows2 = curs.fetchall()
-            if (len(rows2) > 0):
-                #cursor description only
-                #complete if results returned
-                desc = curs.description
-            #combine results
-            rows = rows1 + rows2
 
-        count = len(rows)
+            if len(rows) > 0:
+                for j in range(len(rows)):
+                    matches.append(rows[j])
+                desc = curs.description
+
+        count = len(matches)
 
     conn.close()
 
     if debug:
-        result['debug']['matches'] = rows
+        result['debug']['matches'] = matches
 
     smallest_row = None
     smallest_distance = None
 
-    # For the rows returned, find the one closest to the input lon/lat
+    # For the rows returned, find the smallest calculated distance
     # (the 180 meridian case may result in 2 rows to check)
     for i in range(count):
-        distance = rows[i][24]
+        distance = matches[i][24]
 
         if smallest_row is None:
             smallest_row = i
@@ -1090,7 +1056,7 @@ def reverse_search(lon,lat,debug):
     # reformat into a dictionary keyed with column names
     pprinted = {}
     for i in range(len(desc)):
-        pprinted[desc[i][0]] = rows[smallest_row][i]
+        pprinted[desc[i][0]] = matches[smallest_row][i]
 
     result['count'] = 1
     result['results'].append(pprinted)

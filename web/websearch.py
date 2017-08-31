@@ -918,8 +918,192 @@ Custom template filter - ppretty
 def ppretty(value):
     return MyPrettyPrinter().pformat(value).decode('utf-8')
 
+# ==============================================================================
+"""
+Reverse geo-coding support
 
+Author: Komodo Solutions
+        enquiries@komodo-solutions.co.uk
+        http://www.komodo-solutions.co.uk
+Date:   11.07.2017
+"""
+# reverse_search - find the closest place in the data set to the supplied coordinates
+# lon     - float   - the longitude coordinate, in degrees, for the closest place match
+# lat     - float   - the latitude coordinate, in degrees, for the closest place match
+# debug   - boolean - if true, include diagnostics in the result
+# returns - result, distance tuple
+def reverse_search(lon,lat,debug):
 
+    result = {
+        'count': 0,
+        'results': []
+    }
+
+    if debug:
+        result['debug'] = {
+        	'longitude' : lon,
+        	'latitude' : lat,
+        	'queries' : []
+        }
+
+    #SphinxSearch connection details
+    host = '127.0.0.1'
+    port = 9306
+    try:
+        conn = MySQLdb.connect(host=host, port=port, user='root')
+        curs = conn.cursor()
+    except Exception as ex:
+        status = False
+        result['message'] = str(ex)
+        result['status'] = status
+        return result, 0
+
+    # We attempt to find rows using a small bounding box to
+    # limit the impact of the distance calculation.
+    # If no rows are found with the current bounding box
+    # we double it and try again, until a result is returned.
+
+    delta = 0.0004
+    count = 0
+
+    while count==0:
+        delta *= 2
+        lon_min = lon - delta
+        lon_max = lon + delta
+        lat_min = lat - delta
+        lat_max = lat + delta
+
+        # Bound the latitude
+        lat_min = max(min(lat_min,90.0),-90.0)
+        lat_max = max(min(lat_max,90.0),-90.0)
+
+        #we use the built-in GEODIST function to calculate distance
+        select = "SELECT *, GEODIST("+str(lat)+","+str(lon)+",lat,lon,{in=degrees, out=meters}) as distance FROM ind_name_exact WHERE "
+
+        """
+        SphinxQL does not support the OR operator or the NOT BETWEEN syntax so the only
+        viable approach is to use 2 queries with different longitude conditions for
+        180 meridan spanning cases
+        """
+
+        wherelon = []
+
+        if (lon_min < -180.0):
+
+            wherelon.append("lon BETWEEN {} AND 180.0 ".format(360.0+lon_min))
+
+            wherelon.append("lon BETWEEN -180.0 AND {} ".format(lon_max))
+
+        elif (lon_max > 180.0):
+
+            wherelon.append("lon BETWEEN {} AND 180.0 ".format(lon_min))
+
+            wherelon.append("lon BETWEEN -180.0 AND {} ".format(-360.0+lon_max))
+
+        else:
+            wherelon.append("lon BETWEEN {} AND {} ".format(lon_min, lon_max))
+
+        #latitude condition is the same for all cases
+        wherelat = "lat BETWEEN {} AND {}".format(lat_min, lat_max)
+
+        #we only consider places in the data set
+        whereclass = "class='place'"
+
+        #limit the result set to the single closest match
+        limit = " ORDER BY distance ASC LIMIT 1"
+
+        matches = []
+        desc = None
+
+        #form the final queries and execute
+        for i in range(len(wherelon)):
+            sql = select + " AND ".join([wherelon[i], wherelat, whereclass]) + limit
+
+            if debug:
+                result['debug']['queries'].append(sql)
+
+            curs.execute(sql)
+            rows = curs.fetchall()
+
+            if len(rows) > 0:
+                for j in range(len(rows)):
+                    matches.append(rows[j])
+                desc = curs.description
+
+        count = len(matches)
+
+    conn.close()
+
+    if debug:
+        result['debug']['matches'] = matches
+
+    smallest_row = None
+    smallest_distance = None
+
+    # For the rows returned, find the smallest calculated distance
+    # (the 180 meridian case may result in 2 rows to check)
+    for i in range(count):
+        distance = matches[i][24]
+
+        if smallest_row is None:
+            smallest_row = i
+            smallest_distance = distance
+        else:
+            if (distance < smallest_distance):
+                smallest_row = i
+                smallest_distance = distance
+
+    # reformat into a dictionary keyed with column names
+    pprinted = {}
+    for i in range(len(desc)):
+        pprinted[desc[i][0]] = matches[smallest_row][i]
+
+    result['count'] = 1
+    result['results'].append(pprinted)
+    return result, smallest_distance
+
+# reverse_search_url - REST API for reverse_search
+@app.route('/r/<lon>/<lat>')
+def reverse_search_url(lon, lat):
+    code = 400
+    data = {'format': 'json'}
+
+    debug = request.args.get('debug')
+    times = {}
+
+    if debug:
+        times['start'] = time()
+
+    try:
+        lon = float(lon)
+        lat = float(lat)
+    except:
+        data['result'] = {'message': 'Longitude and latitude must be numeric.'}
+        return formatResponse(data, code)
+
+    if(lon<-180.0 or lon>180.0):
+        data['result'] = {'message': 'Invalid longitude.'}
+        return formatResponse(data, code)
+
+    if(lat<-90.0 or lat>90.0):
+        data['result'] = {'message': 'Invalid latitude.'}
+        return formatResponse(data, code)
+
+    if debug:
+        times['prepare'] = time() - times['start']
+
+    code = 200
+    result, distance = reverse_search(lon,lat,debug)
+    data['result'] = result
+
+    if debug:
+        times['process'] = time() - times['start']
+        result['debug']['times'] = times
+
+    return formatResponse(data, code)
+
+# =============================================================================
+# End Reverse geo-coding support
 # =============================================================================
 
 """

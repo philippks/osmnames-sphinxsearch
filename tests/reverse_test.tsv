@@ -1,0 +1,40 @@
+name	alternative_names	osm_type	osm_id	class	type	lon	lat	place_rank	importance	street	city	county	state	country	country_code	display_name	west	south	east	north	wikidata	wikipedia
+NE quadrant 1		node	1	place	village	25	25	0	0	NE Street	NE city	NE County	NE State	NE Country	ne							en:Place
+NE quadrant 2		node	2	place	village	25.1	25.1	0	0	NE Street	NE city	NE County	NE State	NE Country	ne							en:Place
+SE quadrant 1		node	3	place	village	-25	25	0	0	SE Street	SE city	SE County	SE State	SE Country	se							en:Place
+SE quadrant 2		node	4	place	village	-25.1	25.1	0	0	SE Street	SE city	SE County	SE State	SE Country	se							en:Place
+SW quadrant 1		node	5	place	village	-25	-25	0	0	SW Street	SW city	SW County	SW State	SW Country	sw							en:Place
+SW quadrant 2		node	6	place	village	-25.1	-25.1	0	0	SW Street	SW city	SW County	SW State	SW Country	sw							en:Place
+NW quadrant 1		node	7	place	village	25	-25	0	0	NW Street	NW city	NW County	NW State	NW Country	nw							en:Place
+NW quadrant 2		node	8	place	village	25.1	-25.1	0	0	NW Street	NW city	NW County	NW State	NW Country	nw							en:Place
+zero zero		node	9	place	village	0	0	0	0	00 Street	00 city	00 County	00 State	00 Country	oo							en:Place
+180 plus north		node	10	place	village	179.5	40	0	0	180 plus north Street	180 plus north city	180 plus north county	180 plus north state	180 plus north country	ne							en:Place
+180 minus north		node	11	place	village	-179.5	50	0	0	180 minus north Street	180 minus north city	180 minus north county	180 minus north state	180 minus north country	nw							en:Place
+180 plus south		node	12	place	village	179.5	-40	0	0	180 plus south Street	180 plus south city	180 plus south county	180 plus south state	180 plus south country	se							en:Place
+180 minus south		node	13	place	village	-179.5	-50	0	0	180 minus south Street	180 minus south city	180 minus south county	180 minus south state	180 minus south country	sw							en:Place
+keytest		node	72	place	village	12.34	56.78	0	0	keytest Street	keytest city	keytest county	keytest state	keytest country	kt							en:Place
+Cluster 1		node	101	place	village	44.00001	44.00001	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 2		node	102	place	village	44.00001	44.00002	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 3		node	103	place	village	44.00001	44.00003	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 4		node	104	place	village	44.00001	44.00004	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 5		node	105	place	village	44.00001	44.00005	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 6		node	106	place	village	44.00002	44.00001	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 7		node	107	place	village	44.00002	44.00002	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 8		node	108	place	village	44.00002	44.00003	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 9		node	109	place	village	44.00002	44.00004	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 10		node	110	place	village	44.00002	44.00005	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 11		node	111	place	village	44.00003	44.00001	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 12		node	112	place	village	44.00003	44.00002	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 13		node	113	place	village	44.00003	44.00003	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 14		node	114	place	village	44.00003	44.00004	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 15		node	115	place	village	44.00003	44.00005	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 16		node	116	place	village	44.00004	44.00001	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 17		node	117	place	village	44.00004	44.00002	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 18		node	118	place	village	44.00004	44.00003	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 19		node	119	place	village	44.00004	44.00004	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 20		node	120	place	village	44.00004	44.00005	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 21		node	121	place	village	44.00005	44.00001	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 22		node	122	place	village	44.00005	44.00002	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 23		node	123	place	village	44.00005	44.00003	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 24		node	124	place	village	44.00005	44.00004	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place
+Cluster 25		node	125	place	village	44.00005	44.00005	0	0	clustertest Street	clustertest city	clustertest county	clustertest state	clustertest country	ct							en:Place

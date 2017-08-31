@@ -38,6 +38,7 @@ COPY supervisor/*.conf /etc/supervisor/conf.d/
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY web /usr/local/src/websearch
 COPY sphinx-reindex.sh /
+COPY tests/* /tests/
 
 ENV SPHINX_PORT=9312 \
     SEARCH_MAX_COUNT=100 \

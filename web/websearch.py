@@ -835,7 +835,7 @@ def search_query():
 
     query_filter = {
         'type': None, 'class': None,
-        'street': None, 'city' : None,
+        'street': None, 'city': None,
         'county': None, 'state': None,
         'country': None, 'country_code': None,
         'viewbox': None,
@@ -960,9 +960,9 @@ def reverse_search(lon,lat,debug):
 
     if debug:
         result['debug'] = {
-        	'longitude' : lon,
-        	'latitude' : lat,
-        	'queries' : []
+            'longitude': lon,
+            'latitude': lat,
+            'queries': []
         }
 
     #SphinxSearch connection details

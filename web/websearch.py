@@ -527,6 +527,18 @@ def modify_query_splitor(orig_query):
         return None, orig_query
     return query, orig_query
 
+"""
+Modify query - search and extract UK PostCode
+"""
+def modify_query_postcode(orig_query):
+    # Find UK postcode via regexp
+    q = orig_query.upper()
+    prog = re.compile(r"([A-Z0-9]{2,4}) ?([A-Z0-9]{3,3})")
+    m = prog.match(q)
+    if m:
+        return "{} {}".format(m.group(1), m.group(2)), orig_query
+    else:
+        return None, orig_query
 
 
 # ---------------------------------------------------------
@@ -549,7 +561,7 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
             proc_query = pair[3]
         if debug and index not in times:
             times[index] = {}
-        # Cycle through few modifications of query
+        # Cycle through few modifications of the query
         # Modification function return query with original query (possibly modified) used for the following processing
         query, proc_query = modify(proc_query)
         # No modification has been done
@@ -598,6 +610,13 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     index_modifiers = []
 
     # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
+
+    # 0. PostCodes UK
+    index_modifiers.append(
+        (
+            'ind_postcodes_infix',
+            modify_query_postcode)
+    )
 
     # 1. Boosted name
     if autocomplete:
@@ -1061,6 +1080,7 @@ def reverse_search(lon,lat,debug):
     result['count'] = 1
     result['results'].append(pprinted)
     return result, smallest_distance
+
 
 # reverse_search_url - REST API for reverse_search
 @app.route('/r/<lon>/<lat>')

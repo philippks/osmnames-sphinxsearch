@@ -595,7 +595,7 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
             # Only break, if we have enough matches
             if len(result['matches']) >= result['count']:
                 break
-        else:
+        elif 'matches' not in result:
             result = result_new
     # for pair in index_modifiers
     return rc, result

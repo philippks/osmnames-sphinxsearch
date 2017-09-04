@@ -435,7 +435,7 @@ def prepareNameSuffix(results):
             if row[field] in counts[field]:
                 continue
             # Skip states for not-US
-            if row['country_code'] != 'us' and field == 'state':
+            if 'country_code' in row and row['country_code'] != 'us' and field == 'state':
                 continue
             counts[field].append(row[field])
 

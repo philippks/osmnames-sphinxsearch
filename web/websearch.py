@@ -362,12 +362,13 @@ def prepareResultJson(result, query_filter):
                 res[attr] = r[attr].decode('utf-8')
             else:
                 res[ attr ] = r[attr]
-        # res['boundingbox'] = "{}, {}, {}, {}".format(r['north'], r['south'], r['east'], r['west'])
-        res['boundingbox'] = [res['west'], res['south'], res['east'], res['north']]
-        del res['west']
-        del res['south']
-        del res['east']
-        del res['north']
+        # Prepare bounding box from West/South/East/North attributes
+        if 'west' in res:
+            res['boundingbox'] = [res['west'], res['south'], res['east'], res['north']]
+            del res['west']
+            del res['south']
+            del res['east']
+            del res['north']
         # Empty values for KlokanTech NominatimMatcher JS
         # res['address'] = {
         #     'country_code': '',
@@ -397,7 +398,7 @@ def prepareResultJson(result, query_filter):
 # ---------------------------------------------------------
 
 def parseDisplayName(row):
-    #commas = row['display_name'].count(',')
+    # commas = row['display_name'].count(',')
     parts = row['display_name'].split(', ')
     newrow = {}
     if len(parts) == 5:
@@ -429,6 +430,8 @@ def prepareNameSuffix(results):
     # Separate different country codes
     for row in results:
         for field in counts.keys():
+            if field not in row:
+                continue
             if row[field] in counts[field]:
                 continue
             # Skip states for not-US
@@ -439,18 +442,21 @@ def prepareNameSuffix(results):
     # Prepare name suffix based on counts
     newresults = []
     for row in results:
-        name_suffix = []
-        if not row['city']:
-            row = parseDisplayName(row)
+        try:
+            if not row['city']:
+                row = parseDisplayName(row)
 
-        if row['type'] != 'city' and len(row['city']) > 0 and row['name'] != row['city'] \
-            and (len(counts['city']) > 1 or len(counts['name']) > 1):
-            name_suffix.append(row['city'])
-        if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
-            name_suffix.append(row['state'])
-        if len(counts['country_code']) > 1:
-            name_suffix.append(row['country_code'].upper())
-        row['name_suffix'] = ', '.join(name_suffix)
+            name_suffix = []
+            if (row['type'] != 'city' and len(row['city']) > 0 and row['name'] != row['city'] and
+               (len(counts['city']) > 1 or len(counts['name']) > 1)):
+                name_suffix.append(row['city'])
+            if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
+                name_suffix.append(row['state'])
+            if len(counts['country_code']) > 1:
+                name_suffix.append(row['country_code'].upper())
+            row['name_suffix'] = ', '.join(name_suffix)
+        except:
+            pass
         newresults.append(row)
 
     return newresults
@@ -608,14 +614,15 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     # 2. Prefix on names - full text
     # 3. Infix with Soundex on names - full text
     index_modifiers = []
+    result = {'matches':[]}
 
     # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
 
     # 0. PostCodes UK
-    index_modifiers.append(
-        (
-            'ind_postcodes_infix',
-            modify_query_postcode)
+    index_modifiers.append((
+        'ind_postcodes_infix',
+        modify_query_postcode,
+        'postcode = 1000')
     )
 
     # 1. Boosted name
@@ -666,7 +673,6 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     if debug:
         pprint(index_modifiers)
 
-    result = {'matches':[]}
     # 1. + 2.
     rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
         times, query_filter, start, count, debug)

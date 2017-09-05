@@ -10,25 +10,20 @@
 # Date: 15.07.2016
 
 from flask import Flask, request, Response, render_template, url_for, redirect
-from pprint import pprint, pformat, PrettyPrinter
+from pprint import pprint, PrettyPrinter
 from json import dumps
 from os import getenv, path, utime
 from time import time, mktime
 from datetime import datetime
-import requests
 import sys
 import MySQLdb
 import re
 import natsort
-import rfc822 # Used for parsing RFC822 into datetime
-import email # Used for formatting TS into RFC822
-
-app = Flask(__name__, template_folder='templates/')
-app.debug = not getenv('WEBSEARCH_DEBUG') is None
-app.debug = True
+import rfc822   # Used for parsing RFC822 into datetime
+import email    # Used for formatting TS into RFC822
 
 
-# Return maximal number of results
+# Prepare global variables
 SEARCH_MAX_COUNT = 100
 SEARCH_DEFAULT_COUNT = 20
 if getenv('SEARCH_MAX_COUNT'):
@@ -57,14 +52,13 @@ CHECK_ATTR_FILTER = ['country_code', 'class']
 ATTR_VALUES = {}
 
 
-# ---------------------------------------------------------
-"""
-Get attributes distinct values, using data from index
-dict[ attribute ] = list(values)
-"""
-def get_attributes_values(index, attributes):
-    global ATTR_VALUES
+app = Flask(__name__, template_folder='templates/')
+app.debug = not getenv('WEBSEARCH_DEBUG') is None
+app.debug = True
 
+
+# ---------------------------------------------------------
+def get_db_cursor():
     # connect to the mysql server
     # default server configuration
     host = '127.0.0.1'
@@ -74,16 +68,74 @@ def get_attributes_values(index, attributes):
     if getenv('WEBSEARCH_SERVER_PORT'):
         port = int(getenv('WEBSEARCH_SERVER_PORT'))
 
+    db = MySQLdb.connect(host=host, port=port, user='root')
+    cursor = db.cursor()
+    return db, cursor
+
+
+def get_query_result(cursor, sql, args):
+    """
+    Get result from SQL Query.
+
+    Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
+    """
+    result = {
+        'matches': [],
+        'status': False,
+        'total_found': 0,
+    }
     try:
-        db = MySQLdb.connect(host=host, port=port, user='root')
-        cursor = db.cursor()
+        q = cursor.execute(sql, args)  # noqa
+        # pprint([sql, args, cursor._last_executed, q])
+        desc = cursor.description
+        matches = []
+        for row in cursor:
+            match = {
+                'weight': 0,
+                'attrs': {},
+                'id': 0,
+            }
+            for (name, value) in zip(desc, row):
+                col = name[0]
+                if col == 'id':
+                    match['id'] = value
+                elif col == 'weight':
+                    match['weight'] = value
+                else:
+                    match['attrs'][col] = value
+            matches.append(match)
+        # ~ for row in cursor
+        result['matches'] = matches
+
+        cursor.execute('SHOW META LIKE %s', ('total_found',))
+        for row in cursor:
+            result['total_found'] = int(row[1])
+    except Exception as ex:
+        status = False
+        result['message'] = str(ex)
+
+    result['status'] = status
+    return status, result
+
+
+# ---------------------------------------------------------
+def get_attributes_values(index, attributes):
+    """
+    Get attributes distinct values, using data from index.
+
+    dict[ attribute ] = list(values)
+    """
+    global ATTR_VALUES
+
+    try:
+        db, cursor = get_db_cursor()
     except Exception as ex:
         print(str(ex))
         return False
 
     # Loop over attributes
     if isinstance(attributes, str):
-        attributes = [attributes,]
+        attributes = [attributes, ]
 
     for attr in attributes:
         # clear values
@@ -91,17 +143,17 @@ def get_attributes_values(index, attributes):
         count = 200
         total_found = 0
         # get attributes values for index
-        sqlQuery = 'SELECT {} FROM {} GROUP BY {} LIMIT {}, {}'
-        sqlMeta = 'SHOW META LIKE %s'
+        sql_query = 'SELECT {} FROM {} GROUP BY {} LIMIT {}, {}'
+        sql_meta = 'SHOW META LIKE %s'
         found = 0
         try:
             while total_found == 0 or found < total_found:
-                q = cursor.execute(sqlQuery.format(attr, index, attr, found, count), ())
+                cursor.execute(sql_query.format(attr, index, attr, found, count), ())
                 for row in cursor:
                     found += 1
-                    ATTR_VALUES[attr].append( str(row[0]) )
+                    ATTR_VALUES[attr].append(str(row[0]))
                 if total_found == 0:
-                    q = cursor.execute(sqlMeta, ('total_found',))
+                    cursor.execute(sql_meta, ('total_found',))
                     for row in cursor:
                         total_found = int(row[1])
                         # Skip this attribute, if total found is more than max_matches
@@ -111,30 +163,17 @@ def get_attributes_values(index, attributes):
             if found == 0:
                 del(ATTR_VALUES[attr])
         except Exception as ex:
+            db.close()
             print(str(ex))
             return False
+
+    db.close()
     return True
 
 
-# Load attributes at runtime
-get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
-pprint(ATTR_VALUES)
-
-
-
 # ---------------------------------------------------------
-"""
-Process query to Sphinx searchd with mysql
-"""
-def process_query_mysql(index, query, query_filter, start=0, count=0, field_weights=''):
-    # default server configuration
-    host = '127.0.0.1'
-    port = 9306
-    if getenv('WEBSEARCH_SERVER'):
-        host = getenv('WEBSEARCH_SERVER')
-    if getenv('WEBSEARCH_SERVER_PORT'):
-        port = int(getenv('WEBSEARCH_SERVER_PORT'))
-
+def process_search_index(index, query, query_filter, start=0, count=0, field_weights=''):
+    """Process query to Sphinx searchd with mysql."""
     if count == 0:
         count = SEARCH_DEFAULT_COUNT
     count = min(SEARCH_MAX_COUNT, count)
@@ -150,8 +189,7 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     }
 
     try:
-        db = MySQLdb.connect(host=host, port=port, user='root')
-        cursor = db.cursor()
+        db, cursor = get_db_cursor()
     except Exception as ex:
         status = False
         result['message'] = str(ex)
@@ -181,11 +219,11 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     if 'viewbox' in query_filter and query_filter['viewbox'] is not None:
         bbox = query_filter['viewbox'].split(',')
         # latitude, south, north
-        whereFilter.append('({:.12f} < lat AND lat < {:.12f})'
-            .format(float(bbox[0]), float(bbox[2])))
+        whereFilter.append('({:.12f} < lat AND lat < {:.12f})'.format(
+            float(bbox[0]), float(bbox[2])))
         # longtitude, west, east
-        whereFilter.append('({:.12f} < lon AND lon < {:.12f})'
-            .format(float(bbox[1]), float(bbox[3])))
+        whereFilter.append('({:.12f} < lon AND lon < {:.12f})'.format(
+            float(bbox[1]), float(bbox[3])))
 
     # MATCH query should be last in the WHERE condition
     # Prepare query
@@ -199,8 +237,8 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
             attr = attr.split('-')
             # List of supported sortBy columns - to prevent SQL injection
             if attr[0] not in ('class', 'type', 'street', 'city',
-                'county', 'state', 'country_code', 'country',
-                'importance' 'weight', 'id'):
+                               'county', 'state', 'country_code', 'country',
+                               'importance' 'weight', 'id'):
                 print >> sys.stderr, 'Invalid sortBy column ' + attr[0]
                 continue
             asc = 'ASC'
@@ -239,8 +277,8 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
     # Only if there is more than 1 query elements
     if False and len(query_elements) > 1:
         for qe in query_elements:
-           select_boost.append('IF(name=%s,1000000,0)')
-           argsBoost.append(re.sub(r"\**", "", qe))
+            select_boost.append('IF(name=%s,1000000,0)')
+            argsBoost.append(re.sub(r"\**", "", qe))
 
     # Prepare SELECT
     sql = "SELECT WEIGHT()*importance+{} as weight, * FROM {} WHERE {} ORDER BY {} LIMIT %s, %s OPTION {};".format(
@@ -251,48 +289,23 @@ def process_query_mysql(index, query, query_filter, start=0, count=0, field_weig
         option
     )
 
-    try:
-        args = argsBoost + argsFilter + [start, count]
-        q = cursor.execute(sql, args)
-        # pprint([sql, args, cursor._last_executed, q])
-        desc = cursor.description
-        matches = []
-        for row in cursor:
-            match = {
-                'weight' : 0,
-                'attrs' : {},
-                'id' : 0,
-            }
-            for (name, value) in zip(desc, row):
-                col = name[0]
-                if col == 'id':
-                    match['id'] = value
-                elif col == 'weight':
-                    match['weight'] = value
-                else:
-                    match['attrs'][col] = value
-            matches.append(match)
-        # ~ for row in cursor
-        result['matches'] = matches
+    args = argsBoost + argsFilter + [start, count]
+    status, result = get_query_result(cursor, sql, args)
+    db.close()
 
-        q = cursor.execute('SHOW META LIKE %s', ('total_found',))
-        for row in cursor:
-            result['total_found'] = int(row[1])
-    except Exception as ex:
-        status = False
-        result['message'] = str(ex)
-
+    result['start_index'] = start
+    result['count'] = count
     result['status'] = status
     return status, result
 
 
-
 # ---------------------------------------------------------
-"""
-Merge two result objects into one
-Order matches by weight
-"""
 def mergeResultObject(result_old, result_new):
+    """
+    Merge two result objects into one.
+
+    Order matches by weight
+    """
     # Merge matches
     weight_matches = {}
     unique_id = 0
@@ -301,7 +314,7 @@ def mergeResultObject(result_old, result_new):
     for matches in [result_old['matches'], result_new['matches'], ]:
         for row in matches:
             if row['id'] in unique_ids_list:
-                result_old['total_found'] -= 1 # Decrease total found number
+                result_old['total_found'] -= 1  # Decrease total found number
                 continue
             unique_ids_list.append(row['id'])
             weight = str(row['weight'])
@@ -330,13 +343,9 @@ def mergeResultObject(result_old, result_new):
     return result
 
 
-
 # ---------------------------------------------------------
-"""
-Prepare JSON from pure Result array from SphinxQL
-"""
 def prepareResultJson(result, query_filter):
-
+    """Prepare JSON from pure Result array from SphinxQL."""
     if 'start_index' not in result:
         result = {
             'start_index': 0,
@@ -361,7 +370,7 @@ def prepareResultJson(result, query_filter):
             if isinstance(r[attr], str):
                 res[attr] = r[attr].decode('utf-8')
             else:
-                res[ attr ] = r[attr]
+                res[attr] = r[attr]
         # Prepare bounding box from West/South/East/North attributes
         if 'west' in res:
             res['boundingbox'] = [res['west'], res['south'], res['east'], res['north']]
@@ -384,19 +393,17 @@ def prepareResultJson(result, query_filter):
         response['results'].append(res)
 
     # Prepare next and previous index
-    nextIndex = result['start_index'] + result['count']
-    if nextIndex <= result['total_found']:
-        response['nextIndex'] = nextIndex
-    prevIndex = result['start_index'] - result['count']
-    if prevIndex >= 0:
-        response['previousIndex'] = prevIndex
+    next_index = result['start_index'] + result['count']
+    if next_index <= result['total_found']:
+        response['nextIndex'] = next_index
+    prev_index = result['start_index'] - result['count']
+    if prev_index >= 0:
+        response['previousIndex'] = prev_index
 
     return response
 
 
-
 # ---------------------------------------------------------
-
 def parseDisplayName(row):
     # commas = row['display_name'].count(',')
     parts = row['display_name'].split(', ')
@@ -420,11 +427,8 @@ def parseDisplayName(row):
     return row
 
 
-"""
-Parse and prepare name_suffix based on results
-"""
 def prepareNameSuffix(results):
-
+    """Parse and prepare name_suffix based on results."""
     counts = {'country_code': [], 'state': [], 'city': [], 'name': []}
 
     # Separate different country codes
@@ -462,10 +466,9 @@ def prepareNameSuffix(results):
     return newresults
 
 
-"""
-Format response output
-"""
+# ---------------------------------------------------------
 def formatResponse(data, code=200):
+    """Format response output."""
     # Format json - return empty
     result = data['result'] if 'result' in data else {}
     format = 'json'
@@ -476,18 +479,22 @@ def formatResponse(data, code=200):
 
     tpl = data['template'] if 'template' in data else 'answer.html'
     if format == 'html' and tpl is not None:
-        if not 'route' in data:
+        if 'route' not in data:
             data['route'] = '/'
         return render_template(tpl, rc=(code == 200), **data), code
 
-    json = dumps( result )
+    json = dumps(result)
     mime = 'application/json'
     # Append callback for JavaScript
     if request.args.get('json_callback'):
-        json = request.args.get('json_callback') + "("+json+");";
+        json = "{}({});".format(
+            request.args.get('json_callback'),
+            json)
         mime = 'application/javascript'
     if request.args.get('callback'):
-        json = request.args.get('callback') + "("+json+");";
+        json = "{}({});".format(
+            request.args.get('callback'),
+            json)
         mime = 'application/javascript'
     resp = Response(json, mimetype=mime)
     resp.headers['Access-Control-Allow-Origin'] = '*'
@@ -498,34 +505,29 @@ def formatResponse(data, code=200):
 
 
 # ---------------------------------------------------------
-"""
-Modify query - add asterisk for each element of query, set original query
-"""
 def modify_query_autocomplete(orig_query):
+    """Modify query - add asterisk for each element of query, set original query."""
     query = '* '.join(re.compile("\s*,\s*|\s+").split(orig_query)) + '*'
     query = re.sub(r"\*+", "*", query)
     return query, orig_query
 
-"""
-Modify query - use and set original
-"""
+
 def modify_query_orig(orig_query):
+    """Modify query - use and set original."""
     return orig_query, orig_query
 
-"""
-Modify query - remove house number, use and set modified query
-"""
+
 def modify_query_remhouse(orig_query):
+    """Modify query - remove house number, use and set modified query."""
     # Remove any number from the request
     query = re.sub(r"\d+([/, ]\d+)?", "", orig_query)
     if query == orig_query:
         return None, orig_query
     return query, query
 
-"""
-Modify query - split query elements as OR, use modified and set original query
-"""
+
 def modify_query_splitor(orig_query):
+    """Modify query - split query elements as OR, use modified and set original query."""
     if orig_query.startswith('@'):
         return None, orig_query
     query = ' | '.join(re.compile("\s*,\s*|\s+").split(orig_query))
@@ -533,10 +535,9 @@ def modify_query_splitor(orig_query):
         return None, orig_query
     return query, orig_query
 
-"""
-Modify query - search and extract UK PostCode
-"""
+
 def modify_query_postcode(orig_query):
+    """Modify query - search and extract UK PostCode."""
     # Find UK postcode via regexp
     q = orig_query.upper()
     prog = re.compile(r"([A-Z0-9]{2,4}) ?([A-Z0-9]{3,3})")
@@ -548,11 +549,9 @@ def modify_query_postcode(orig_query):
 
 
 # ---------------------------------------------------------
-"""
-Process array of modifiers and return results
-"""
 def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
-    query_filter, start, count, debug = False):
+                            query_filter, start, count, debug=False):
+    """Process array of modifiers and return results."""
     rc = False
     result = {}
     proc_query = orig_query
@@ -568,7 +567,8 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
         if debug and index not in times:
             times[index] = {}
         # Cycle through few modifications of the query
-        # Modification function return query with original query (possibly modified) used for the following processing
+        # Modification function return query with original query
+        #  (possibly modified) used for the following processing
         query, proc_query = modify(proc_query)
         # No modification has been done
         if query is None:
@@ -576,8 +576,9 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
         # Process modified query
         if debug:
             times['start_query'] = time()
-        rc, result_new = process_query_mysql(index, query, query_filter,
-                start, count, field_weights)
+        rc, result_new = process_search_index(
+            index, query, query_filter,
+            start, count, field_weights)
         if debug:
             times[index][modify.__name__] = time() - times['start_query']
         if rc and 'matches' in result_new and len(result_new['matches']) > 0:
@@ -601,13 +602,10 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
     return rc, result
 
 
-
 # ---------------------------------------------------------
-"""
-Common search method.
-"""
 def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
-        debug=False, times={}, debug_result={}):
+           debug=False, times={}, debug_result={}):
+    """Common search method."""
     # Basic steps to search - using query modifiers over different index
     # 0. Detect pure Lat Lon (2 float numbers) query [last]
     # 1. Search in PostCodes (UK)
@@ -618,7 +616,9 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
 
     # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
     index_modifiers = []
-    result = {'matches':[]}
+    result = {
+        'matches': []
+    }
 
     # 0. Detect pure Lat Lon (2 float numbers)
     floats = re.compile(r"(-?[0-9]+.?[0-9]*) (-?[0-9]+.?[0-9]*)")
@@ -628,7 +628,7 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
         lat = m.group(1)
         lon = m.group(2)
     else:
-        # Try parsing 50°00'00.0"N 14°00'00.0"E
+        # Try parsing 50°00'00.0"N 14°00'00.0"E or similar requests
         query = orig_query
         query = query.replace('°', ' ')
         query = query.replace('\'', ' ')
@@ -677,54 +677,64 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
 
     # 2. Boosted name
     if autocomplete:
-        index_modifiers.append( ('ind_name_exact',
-                modify_query_autocomplete,
-                'name = 1000, alternative_names = 990',
-            ) )
-        index_modifiers.append( ('ind_name_prefix',
-                modify_query_autocomplete,
-                'name = 900, alternative_names = 890',
-            ) )
-    index_modifiers.append( ('ind_name_exact',
-            modify_query_orig,
-            'name = 800, alternative_names = 790',
-        ) )
-    index_modifiers.append( ('ind_name_prefix',
-            modify_query_orig,
-            'name = 700, alternative_names = 690',
-        ) )
-    index_modifiers.append( ('ind_name_exact',
-            modify_query_remhouse,
-            'name = 600, alternative_names = 590',
-            orig_query,
-        ) )
-    index_modifiers.append( ('ind_name_prefix',
-            modify_query_remhouse,
-            'name = 500, alternative_names = 490',
-            orig_query,
-        ) )
+        index_modifiers.append((
+            'ind_name_exact',
+            modify_query_autocomplete,
+            'name = 1000, alternative_names = 990',)
+        )
+        index_modifiers.append((
+            'ind_name_prefix',
+            modify_query_autocomplete,
+            'name = 900, alternative_names = 890',)
+        )
+    index_modifiers.append((
+        'ind_name_exact',
+        modify_query_orig,
+        'name = 800, alternative_names = 790',)
+    )
+    index_modifiers.append((
+        'ind_name_prefix',
+        modify_query_orig,
+        'name = 700, alternative_names = 690',)
+    )
+    index_modifiers.append((
+        'ind_name_exact',
+        modify_query_remhouse,
+        'name = 600, alternative_names = 590',
+        orig_query,)
+    )
+    index_modifiers.append((
+        'ind_name_prefix',
+        modify_query_remhouse,
+        'name = 500, alternative_names = 490',
+        orig_query,)
+    )
 
     # 3. Prefix on names
     if autocomplete:
-        index_modifiers.append( ('ind_names_prefix',
-                modify_query_autocomplete,
-                'name = 300, alternative_names = 290, display_name = 70',
-            ) )
-    index_modifiers.append( ('ind_names_prefix',
-            modify_query_orig,
-            'name = 200, alternative_names = 190, display_name = 60',
-        ) )
-    index_modifiers.append( ('ind_names_prefix',
-            modify_query_remhouse,
-            'name = 100, alternative_names = 95, display_name = 50',
-            orig_query,
-        ) )
+        index_modifiers.append((
+            'ind_names_prefix',
+            modify_query_autocomplete,
+            'name = 300, alternative_names = 290, display_name = 70',)
+        )
+    index_modifiers.append((
+        'ind_names_prefix',
+        modify_query_orig,
+        'name = 200, alternative_names = 190, display_name = 60',)
+    )
+    index_modifiers.append((
+        'ind_names_prefix',
+        modify_query_remhouse,
+        'name = 100, alternative_names = 95, display_name = 50',
+        orig_query,)
+    )
 
     if debug:
         pprint(index_modifiers)
 
     # 1. + 2. + 3.
-    rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
+    rc, result = process_query_modifiers(
+        orig_query, index_modifiers, debug_result,
         times, query_filter, start, count, debug)
 
     if debug:
@@ -733,52 +743,56 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
 
     result_first = result
     # 4. + 5.
-    if not rc or not 'matches' in result or len(result['matches']) == 0:
+    if not rc or 'matches' not in result or len(result['matches']) == 0:
         index_modifiers = []
         # 4. Infix with soundex on names
         if autocomplete:
-            index_modifiers.append( ('ind_names_infix_soundex',
-                    modify_query_autocomplete,
-                    'name = 90, alternative_names = 89, display_name = 40',
-                ) )
-        index_modifiers.append( ('ind_names_infix_soundex',
-                modify_query_orig,
-                'name = 70, alternative_names = 69, display_name = 20',
-            ) )
-        index_modifiers.append( ('ind_names_infix_soundex',
-                modify_query_remhouse,
-                'name = 50, alternative_names = 49, display_name = 10',
-                orig_query,
-            ) )
+            index_modifiers.append((
+                'ind_names_infix_soundex',
+                modify_query_autocomplete,
+                'name = 90, alternative_names = 89, display_name = 40',)
+            )
+        index_modifiers.append((
+            'ind_names_infix_soundex',
+            modify_query_orig,
+            'name = 70, alternative_names = 69, display_name = 20',)
+        )
+        index_modifiers.append((
+            'ind_names_infix_soundex',
+            modify_query_remhouse,
+            'name = 50, alternative_names = 49, display_name = 10',
+            orig_query,)
+        )
         # 5. If no result were found, try splitor modifier on prefix and infix soundex
-        index_modifiers.append( ('ind_names_prefix',
-                modify_query_splitor,
-                'name = 20, alternative_names = 19, display_name = 1',
-            ) )
-        index_modifiers.append( ('ind_names_infix_soundex',
-                modify_query_splitor,
-                'name = 10, alternative_names = 9, display_name = 1',
-            ) )
-        rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
+        index_modifiers.append((
+            'ind_names_prefix',
+            modify_query_splitor,
+            'name = 20, alternative_names = 19, display_name = 1',)
+        )
+        index_modifiers.append((
+            'ind_names_infix_soundex',
+            modify_query_splitor,
+            'name = 10, alternative_names = 9, display_name = 1',)
+        )
+        rc, result = process_query_modifiers(
+            orig_query, index_modifiers, debug_result,
             times, query_filter, start, count, debug)
 
     if debug:
         pprint(rc)
         pprint(result)
-
     if 'matches' not in result:
         result = result_first
-
     return rc, result
 
 
-
 # ---------------------------------------------------------
-"""
-Check request header for 'if-modified-since'
-Return True if content wasn't modified (According to the timestamp)
-"""
 def has_modified_header(headers):
+    """
+    Check request header for 'if-modified-since'.
+
+    Return True if content wasn't modified (According to the timestamp)
+    """
     global DATA_LAST_MODIFIED
 
     modified = headers.get('if-modified-since')
@@ -797,7 +811,7 @@ def has_modified_header(headers):
         # pprint([headers, modified, DATA_LAST_MODIFIED, mtime])
         # pprint([mtime, rfc822.parsedate(modified), mktime(rfc822.parsedate(modified))])
         modified_file = datetime.fromtimestamp(mtime)
-        modified_file = modified_file.replace(microsecond = 0)
+        modified_file = modified_file.replace(microsecond=0)
         modified_date = datetime.fromtimestamp(mktime(rfc822.parsedate(modified)))
 
         # pprint([
@@ -807,18 +821,14 @@ def has_modified_header(headers):
         # ])
         if modified_file <= modified_date:
             return True
-
     return False
 
 
-
 # ---------------------------------------------------------
-"""
-Autocomplete searching via HTTP URL
-"""
 @app.route('/q/<query>.js', defaults={'country_code': None})
 @app.route('/<country_code>/q/<query>.js')
 def search_url(country_code, query):
+    """Autocomplete searching via HTTP URL."""
     autocomplete = True
     code = 400
     data = {'query': '', 'route': '/', 'format': 'json'}
@@ -841,7 +851,7 @@ def search_url(country_code, query):
 
     data['query'] = query
     data['result'] = prepareResultJson(result, query_filter)
-    if len(data['result']['results']) > 0 :
+    if len(data['result']['results']) > 0:
         data['result']['results'] = prepareNameSuffix(data['result']['results'])
 
     return formatResponse(data, code)
@@ -857,14 +867,10 @@ def search_url_js(country_code, query):
     return search_url(country_code, query)
 
 
-
 # ---------------------------------------------------------
-"""
-Global searching via HTTP Query
-"""
 @app.route('/')
 def search_query():
-
+    """Global searching via HTTP Query."""
     if NOCACHEREDIRECT:
         return redirect(NOCACHEREDIRECT, code=302)
 
@@ -950,7 +956,7 @@ def search_query():
         times['process'] = time() - times['start']
         debug_result['times'] = times
     data['result'] = prepareResultJson(result, query_filter)
-    if len(data['result']['results']) > 0 :
+    if len(data['result']['results']) > 0:
         data['result']['results'] = prepareNameSuffix(data['result']['results'])
     data['debug_result'] = debug_result
     data['autocomplete'] = autocomplete
@@ -962,18 +968,17 @@ def search_query():
     return formatResponse(data, code)
 
 
-
 # ---------------------------------------------------------
+
 
 class MyPrettyPrinter(PrettyPrinter):
     def format(self, object, context, maxlevels, level):
         if isinstance(object, unicode):
-            return ('"'+object.encode('utf-8')+'"', True, False)
+            return ('"' + object.encode('utf-8') + '"', True, False)
         return PrettyPrinter.format(self, object, context, maxlevels, level)
 
-"""
-Custom template filter - nl2br
-"""
+
+# Custom template filter - nl2br
 @app.template_filter()
 def nl2br(value):
     if isinstance(value, dict):
@@ -986,14 +991,13 @@ def nl2br(value):
         return value
 
 
-"""
-Custom template filter - ppretty
-"""
+# Custom template filter - ppretty
 @app.template_filter()
 def ppretty(value):
     return MyPrettyPrinter().pformat(value).decode('utf-8')
 
-# ==============================================================================
+
+# =============================================================================
 """
 Reverse geo-coding support
 
@@ -1002,13 +1006,14 @@ Author: Komodo Solutions
         http://www.komodo-solutions.co.uk
 Date:   11.07.2017
 """
+
+
 # reverse_search - find the closest place in the data set to the supplied coordinates
 # lon     - float   - the longitude coordinate, in degrees, for the closest place match
 # lat     - float   - the latitude coordinate, in degrees, for the closest place match
 # debug   - boolean - if true, include diagnostics in the result
 # returns - result, distance tuple
-def reverse_search(lon,lat,debug):
-
+def reverse_search(lon, lat, debug):
     result = {
         'count': 0,
         'results': []
@@ -1021,12 +1026,8 @@ def reverse_search(lon,lat,debug):
             'queries': []
         }
 
-    #SphinxSearch connection details
-    host = '127.0.0.1'
-    port = 9306
     try:
-        conn = MySQLdb.connect(host=host, port=port, user='root')
-        curs = conn.cursor()
+        db, cursor = get_db_cursor()
     except Exception as ex:
         status = False
         result['message'] = str(ex)
@@ -1041,7 +1042,7 @@ def reverse_search(lon,lat,debug):
     delta = 0.0004
     count = 0
 
-    while count==0:
+    while count == 0:
         delta *= 2
         lon_min = lon - delta
         lon_max = lon + delta
@@ -1049,98 +1050,74 @@ def reverse_search(lon,lat,debug):
         lat_max = lat + delta
 
         # Bound the latitude
-        lat_min = max(min(lat_min,90.0),-90.0)
-        lat_max = max(min(lat_max,90.0),-90.0)
-
-        #we use the built-in GEODIST function to calculate distance
-        select = "SELECT *, GEODIST("+str(lat)+","+str(lon)+",lat,lon,{in=degrees, out=meters}) as distance FROM ind_name_exact WHERE "
+        lat_min = max(min(lat_min, 90.0), -90.0)
+        lat_max = max(min(lat_max, 90.0), -90.0)
+        # we use the built-in GEODIST function to calculate distance
+        select = ("SELECT *, GEODIST(" + str(lat) + ", " + str(lon) +
+                  ", lat, lon, {in=degrees, out=meters}) as distance"
+                  " FROM ind_name_exact WHERE ")
 
         """
         SphinxQL does not support the OR operator or the NOT BETWEEN syntax so the only
         viable approach is to use 2 queries with different longitude conditions for
         180 meridan spanning cases
         """
-
         wherelon = []
-
         if (lon_min < -180.0):
-
-            wherelon.append("lon BETWEEN {} AND 180.0 ".format(360.0+lon_min))
-
-            wherelon.append("lon BETWEEN -180.0 AND {} ".format(lon_max))
-
+            wherelon.append("lon BETWEEN {} AND 180.0".format(360.0 + lon_min))
+            wherelon.append("lon BETWEEN -180.0 AND {}".format(lon_max))
         elif (lon_max > 180.0):
-
-            wherelon.append("lon BETWEEN {} AND 180.0 ".format(lon_min))
-
-            wherelon.append("lon BETWEEN -180.0 AND {} ".format(-360.0+lon_max))
-
+            wherelon.append("lon BETWEEN {} AND 180.0".format(lon_min))
+            wherelon.append("lon BETWEEN -180.0 AND {}".format(-360.0 + lon_max))
         else:
-            wherelon.append("lon BETWEEN {} AND {} ".format(lon_min, lon_max))
-
-        #latitude condition is the same for all cases
+            wherelon.append("lon BETWEEN {} AND {}".format(lon_min, lon_max))
+        # latitude condition is the same for all cases
         wherelat = "lat BETWEEN {} AND {}".format(lat_min, lat_max)
-
-        #we only consider places in the data set
+        # we only consider places in the data set
         whereclass = "class='place'"
-
-        #limit the result set to the single closest match
+        # limit the result set to the single closest match
         limit = " ORDER BY distance ASC LIMIT 1"
 
-        matches = []
-        desc = None
-
-        #form the final queries and execute
-        for i in range(len(wherelon)):
-            sql = select + " AND ".join([wherelon[i], wherelat, whereclass]) + limit
-
+        result = {}
+        # form the final queries and execute
+        for where in wherelon:
+            sql = select + " AND ".join([where, wherelat, whereclass]) + limit
             if debug:
                 result['debug']['queries'].append(sql)
+            # Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
+            status, result_new = get_query_result(cursor, sql, ())
+            if 'matches' in result and len(result['matches']) > 0:
+                result = mergeResultObject(result, result_new)
+            else:
+                result = result_new.copy()
 
-            curs.execute(sql)
-            rows = curs.fetchall()
-
-            if len(rows) > 0:
-                for j in range(len(rows)):
-                    matches.append(rows[j])
-                desc = curs.description
-
-        count = len(matches)
-
-    conn.close()
+        count = len(result['matches'])
+    db.close()
 
     if debug:
-        result['debug']['matches'] = matches
+        result['debug']['matches'] = result['matches']
 
     smallest_row = None
     smallest_distance = None
 
     # For the rows returned, find the smallest calculated distance
     # (the 180 meridian case may result in 2 rows to check)
-    for i in range(count):
-        distance = matches[i][24]
+    for match in result['matches']:
+        distance = match['attrs']['distance']
 
-        if smallest_row is None:
-            smallest_row = i
+        if smallest_row is None or distance < smallest_distance:
+            smallest_row = match
             smallest_distance = distance
-        else:
-            if (distance < smallest_distance):
-                smallest_row = i
-                smallest_distance = distance
-
-    # reformat into a dictionary keyed with column names
-    pprinted = {}
-    for i in range(len(desc)):
-        pprinted[desc[i][0]] = matches[smallest_row][i]
 
     result['count'] = 1
-    result['results'].append(pprinted)
+    result['matches'] = [smallest_row]
     return result, smallest_distance
 
 
-# reverse_search_url - REST API for reverse_search
+# ---------------------------------------------------------
 @app.route('/r/<lon>/<lat>')
 def reverse_search_url(lon, lat):
+    """REST API for reverse_search."""
     code = 400
     data = {'format': 'json'}
 
@@ -1157,11 +1134,10 @@ def reverse_search_url(lon, lat):
         data['result'] = {'message': 'Longitude and latitude must be numeric.'}
         return formatResponse(data, code)
 
-    if(lon<-180.0 or lon>180.0):
+    if lon < -180.0 or lon > 180.0:
         data['result'] = {'message': 'Invalid longitude.'}
         return formatResponse(data, code)
-
-    if(lat<-90.0 or lat>90.0):
+    if lat < -90.0 or lat > 90.0:
         data['result'] = {'message': 'Invalid latitude.'}
         return formatResponse(data, code)
 
@@ -1169,7 +1145,7 @@ def reverse_search_url(lon, lat):
         times['prepare'] = time() - times['start']
 
     code = 200
-    result, distance = reverse_search(lon,lat,debug)
+    result, distance = reverse_search(lon, lat, debug)
     data['result'] = result
 
     if debug:
@@ -1182,9 +1158,14 @@ def reverse_search_url(lon, lat):
 # End Reverse geo-coding support
 # =============================================================================
 
+
+# Load attributes at runtime
+get_attributes_values('ind_name_exact', CHECK_ATTR_FILTER)
+pprint(ATTR_VALUES)
+
+
 """
 Main launcher
 """
 if __name__ == '__main__':
-        app.run(threaded=False, host='0.0.0.0', port=8000)
-
+    app.run(threaded=False, host='0.0.0.0', port=8000)

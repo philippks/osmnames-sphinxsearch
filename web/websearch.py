@@ -649,15 +649,19 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
             'total_found': 2,
             'matches': [
                 {
-                    'name': orig_query,
-                    'display_name': orig_query,
-                    'lat': lat,
-                    'lon': lon,
-                    'west': lon,
-                    'south': lat,
-                    'east': lon,
-                    'north': lat,
-                    'type': 'latlon',
+                    'id': 1,
+                    'weight': 1,
+                    'attrs': {
+                        'name': orig_query,
+                        'display_name': orig_query,
+                        'lat': lat,
+                        'lon': lon,
+                        'west': lon,
+                        'south': lat,
+                        'east': lon,
+                        'north': lat,
+                        'type': 'latlon',
+                    }
                 },
                 location
             ],

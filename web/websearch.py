@@ -604,28 +604,74 @@ def process_query_modifiers(orig_query, index_modifiers, debug_result, times,
 
 # ---------------------------------------------------------
 """
-Common search method
+Common search method.
 """
 def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
         debug=False, times={}, debug_result={}):
+    # Basic steps to search - using query modifiers over different index
+    # 0. Detect pure Lat Lon (2 float numbers) query [last]
+    # 1. Search in PostCodes (UK)
+    # 2. Boosted prefix+exact on name
+    # 3. Prefix on names - full text
+    # 4. Infix with Soundex on names - full text
+    # 5. If no results, try splitor on prefix and infix
 
-    # Iterating only over 3 index
-    # 1. Boosted prefix+exact on name
-    # 2. Prefix on names - full text
-    # 3. Infix with Soundex on names - full text
+    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
     index_modifiers = []
     result = {'matches':[]}
 
-    # Pair is (index, modify_function, [field_weights, [index_weights, [orig_query]]])
+    # 0. Detect pure Lat Lon (2 float numbers)
+    floats = re.compile(r"(-?[0-9]+.?[0-9]*) (-?[0-9]+.?[0-9]*)")
+    m = floats.match(orig_query)
+    lat = lon = None
+    if m:
+        lat = m.group(1)
+        lon = m.group(2)
+    else:
+        # Try parsing 50°00'00.0"N 14°00'00.0"E
+        query = orig_query
+        query = query.replace('°', ' ')
+        query = query.replace('\'', ' ')
+        query = query.replace('\"', ' ')
+        latlon = re.compile(r"([-0-9. ]+)([N|S]) *([-0-9. ]+)([E|W])").match(query)
+        if latlon:
+            def degree_to_float(val, face):
+                multipler = 1 if face in ['N', 'E'] else -1
+                return multipler * sum(float(x) / 60 ** n for n, x in enumerate(re.split(r" +", val)))
+            lat = degree_to_float(latlon.group(1).strip(), latlon.group(2))
+            lon = degree_to_float(latlon.group(3).strip(), latlon.group(4))
+    if lat and lon:
+        rev_result, distance = reverse_search(lat, lon, debug)
+        location = rev_result['results'][0]
+        result = {
+            'start_index': 0,
+            'count': 2,
+            'total_found': 2,
+            'matches': [
+                {
+                    'name': orig_query,
+                    'display_name': orig_query,
+                    'lat': lat,
+                    'lon': lon,
+                    'west': lon,
+                    'south': lat,
+                    'east': lon,
+                    'north': lat,
+                    'type': 'latlon',
+                },
+                location
+            ],
+        }
+        return True, result
 
-    # 0. PostCodes UK
+    # 1. PostCodes (UK)
     index_modifiers.append((
         'ind_postcodes_infix',
         modify_query_postcode,
         'postcode = 1000')
     )
 
-    # 1. Boosted name
+    # 2. Boosted name
     if autocomplete:
         index_modifiers.append( ('ind_name_exact',
                 modify_query_autocomplete,
@@ -654,7 +700,7 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
             orig_query,
         ) )
 
-    # 2. Prefix on names
+    # 3. Prefix on names
     if autocomplete:
         index_modifiers.append( ('ind_names_prefix',
                 modify_query_autocomplete,
@@ -673,7 +719,7 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     if debug:
         pprint(index_modifiers)
 
-    # 1. + 2.
+    # 1. + 2. + 3.
     rc, result = process_query_modifiers(orig_query, index_modifiers, debug_result,
         times, query_filter, start, count, debug)
 
@@ -682,10 +728,10 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
         pprint(result)
 
     result_first = result
-    # 3. + 4.
+    # 4. + 5.
     if not rc or not 'matches' in result or len(result['matches']) == 0:
         index_modifiers = []
-        # 3. Infix with soundex on names
+        # 4. Infix with soundex on names
         if autocomplete:
             index_modifiers.append( ('ind_names_infix_soundex',
                     modify_query_autocomplete,
@@ -700,7 +746,7 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
                 'name = 50, alternative_names = 49, display_name = 10',
                 orig_query,
             ) )
-        # 4. If no result were found, try splitor modifier on prefix and infix soundex
+        # 5. If no result were found, try splitor modifier on prefix and infix soundex
         index_modifiers.append( ('ind_names_prefix',
                 modify_query_splitor,
                 'name = 20, alternative_names = 19, display_name = 1',

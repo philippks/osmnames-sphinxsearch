@@ -636,11 +636,14 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
         query = query.replace('°', ' ')
         query = query.replace('\'', ' ')
         query = query.replace('\"', ' ')
-        latlon = re.compile(r"([-0-9. ]+)([N|S]) *([-0-9. ]+)([E|W])").match(query)
+        latlon = re.compile(r"([-0-9. ]+)([N|S]) *([-0-9. ]+)([E|W])").match(
+            query.upper())
         if latlon:
             def degree_to_float(val, face):
                 multipler = 1 if face in ['N', 'E'] else -1
-                return multipler * sum(float(x) / 60 ** n for n, x in enumerate(re.split(r" +", val)))
+                return multipler * sum(
+                    float(x) / 60 ** n for n, x in enumerate(
+                        re.split(r" +", val)))
             lat = degree_to_float(latlon.group(1).strip(), latlon.group(2))
             lon = degree_to_float(latlon.group(3).strip(), latlon.group(4))
     if lat and lon:
@@ -1113,6 +1116,7 @@ def reverse_search(lon, lat, debug):
     result['matches'] = [smallest_row]
     result['start_index'] = 1
     result['status'] = True
+    result['total_found'] = 1
     return result, smallest_distance
 
 

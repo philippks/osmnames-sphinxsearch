@@ -628,8 +628,8 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
     m = floats.match(orig_query)
     lat = lon = None
     if m:
-        lat = m.group(1)
-        lon = m.group(2)
+        lat = float(m.group(1))
+        lon = float(m.group(2))
     else:
         # Try parsing 50°00'00.0"N 14°00'00.0"E or similar requests
         query = orig_query
@@ -644,30 +644,31 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
             lat = degree_to_float(latlon.group(1).strip(), latlon.group(2))
             lon = degree_to_float(latlon.group(3).strip(), latlon.group(4))
     if lat and lon:
-        rev_result, distance = reverse_search(lat, lon, debug)
-        location = rev_result['results'][0]
+        rev_result, distance = reverse_search(lon, lat, debug)
+        matches = [
+            {
+                'id': 0,
+                'weight': 0,
+                'attrs': {
+                    'name': orig_query,
+                    'display_name': orig_query,
+                    'lat': lat,
+                    'lon': lon,
+                    'west': lon,
+                    'south': lat,
+                    'east': lon,
+                    'north': lat,
+                    'type': 'latlon',
+                }
+            },
+        ]
+        if len(rev_result['matches']):
+            matches.append(rev_result['matches'][0])
         result = {
             'start_index': 0,
-            'count': 2,
-            'total_found': 2,
-            'matches': [
-                {
-                    'id': 1,
-                    'weight': 1,
-                    'attrs': {
-                        'name': orig_query,
-                        'display_name': orig_query,
-                        'lat': lat,
-                        'lon': lon,
-                        'west': lon,
-                        'south': lat,
-                        'east': lon,
-                        'north': lat,
-                        'type': 'latlon',
-                    }
-                },
-                location
-            ],
+            'count': len(matches),
+            'total_found': len(matches),
+            'matches': matches
         }
         return True, result
 
@@ -1110,6 +1111,8 @@ def reverse_search(lon, lat, debug):
 
     result['count'] = 1
     result['matches'] = [smallest_row]
+    result['start_index'] = 1
+    result['status'] = True
     return result, smallest_distance
 
 

@@ -79,6 +79,7 @@ def get_query_result(cursor, sql, args):
 
     Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
     """
+    status = False
     result = {
         'matches': [],
         'status': False,
@@ -89,6 +90,7 @@ def get_query_result(cursor, sql, args):
         # pprint([sql, args, cursor._last_executed, q])
         desc = cursor.description
         matches = []
+        status = True
         for row in cursor:
             match = {
                 'weight': 0,
@@ -111,7 +113,6 @@ def get_query_result(cursor, sql, args):
         for row in cursor:
             result['total_found'] = int(row[1])
     except Exception as ex:
-        status = False
         result['message'] = str(ex)
 
     result['status'] = status
@@ -344,7 +345,7 @@ def mergeResultObject(result_old, result_new):
 
 
 # ---------------------------------------------------------
-def prepareResultJson(result, query_filter):
+def prepareResultJson(result):
     """Prepare JSON from pure Result array from SphinxQL."""
     if 'start_index' not in result:
         result = {
@@ -399,6 +400,8 @@ def prepareResultJson(result, query_filter):
     prev_index = result['start_index'] - result['count']
     if prev_index >= 0:
         response['previousIndex'] = prev_index
+
+    response['results'] = prepareNameSuffix(response['results'])
 
     return response
 
@@ -850,9 +853,7 @@ def search_url(country_code, query):
         code = 200
 
     data['query'] = query
-    data['result'] = prepareResultJson(result, query_filter)
-    if len(data['result']['results']) > 0:
-        data['result']['results'] = prepareNameSuffix(data['result']['results'])
+    data['result'] = prepareResultJson(result)
 
     return formatResponse(data, code)
 
@@ -955,9 +956,7 @@ def search_query():
     if debug:
         times['process'] = time() - times['start']
         debug_result['times'] = times
-    data['result'] = prepareResultJson(result, query_filter)
-    if len(data['result']['results']) > 0:
-        data['result']['results'] = prepareNameSuffix(data['result']['results'])
+    data['result'] = prepareResultJson(result)
     data['debug_result'] = debug_result
     data['autocomplete'] = autocomplete
     data['debug'] = debug
@@ -1146,7 +1145,7 @@ def reverse_search_url(lon, lat):
 
     code = 200
     result, distance = reverse_search(lon, lat, debug)
-    data['result'] = result
+    data['result'] = prepareResultJson(result)
 
     if debug:
         times['process'] = time() - times['start']

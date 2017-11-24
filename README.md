@@ -49,12 +49,13 @@ east
 north
 wikidata
 wikipedia
+housenumbers
 ```
 
 The source data should be **sorted by the column `importance`**, and include a header row.
-For the description of these columns, see [data format in geometalab/OSMNames repository](https://github.com/geometalab/OSMNames#data-format-of-tsv-export-of-osmnames).
+For the description of these columns, see [data format in OSMNames documentation](http://osmnames.readthedocs.io/en/latest/introduction.html#output-format).
 
-If no data is specified then a 100k OSMNames sample is automatically downloaded from from [geometalab/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v1.1)
+If no data is specified then a 100k OSMNames sample is automatically downloaded from from [OSMNames/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.3).
 
 # Usage of docker image
 
@@ -108,8 +109,8 @@ The SphinxSearch full-text search service requires indexing of the source data.
 The index operation is required only for the first time or if the source data has been changed.
 This operation takes longer on a source with more lines, and requires more space storage as well.
 
-A demo sample data with 100 000 lines has **9.3 MiB gzip**-ed source data file and requires storage space of **133.8 MiB for the index** folder. The operation takes (on average) 15 seconds.
+A demo sample data with 100 000 lines has **8.15 MiB gzip** source data file and requires storage space of **314 MiB for the index** folder. The operation takes (on average) 33 seconds.
 
-The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v1.1/planet-latest.tsv.gz) with 21 million lines requires storage space of **27.4 GiB for the index** folder. The operation takes (on average) 48 minutes.
+The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v2.0.3/planet-latest_geonames.tsv.gz) with 23 million lines requires storage space of **34 GiB for the index** folder. The operation takes (on average) 22 minutes.
 
 The indexing is done automatically (if a particular index file is missing) via the `sphinx-reindex.sh` script. You can use this script to force run the index operation as well: `$ time bash sphinx-reindex.sh force`.

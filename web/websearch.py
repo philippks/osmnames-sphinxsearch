@@ -250,7 +250,6 @@ def process_search_index(index, query, query_filter, start=0, count=0, field_wei
     if len(sortBy) == 0:
         sortBy.append('weight DESC')
 
-
     # Field weights and other options
     # ranker=expr('sum(lcs*user_weight)*1000+bm25') == SPH_RANK_PROXIMITY_BM25
     # ranker=expr('sum((4*lcs+2*(min_hit_pos==1)+exact_hit)*user_weight)*1000+bm25') == SPH_RANK_SPH04
@@ -865,7 +864,7 @@ def search_url(country_code, query):
 # Alias without redirect
 @app.route('/q/<query>', defaults={'country_code': None})
 @app.route('/<country_code>/q/<query>')
-def search_url_js(country_code, query):
+def search_url_public(country_code, query):
     if NOCACHEREDIRECT:
         return redirect(NOCACHEREDIRECT, code=302)
 
@@ -1121,7 +1120,7 @@ def reverse_search(lon, lat, debug):
 
 
 # ---------------------------------------------------------
-@app.route('/r/<lon>/<lat>')
+@app.route('/r/<lon>/<lat>.js')
 def reverse_search_url(lon, lat):
     """REST API for reverse_search."""
     code = 400
@@ -1159,6 +1158,14 @@ def reverse_search_url(lon, lat):
         result['debug']['times'] = times
 
     return formatResponse(data, code)
+
+
+@app.route('/r/<lon>/<lat>')
+def reverse_search_url_public(lon, lat):
+    if NOCACHEREDIRECT:
+        return redirect(NOCACHEREDIRECT, code=302)
+
+    return reverse_search_url(lon, lat)
 
 # =============================================================================
 # End Reverse geo-coding support

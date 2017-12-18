@@ -53,8 +53,7 @@ ATTR_VALUES = {}
 
 
 app = Flask(__name__, template_folder='templates/')
-app.debug = not getenv('WEBSEARCH_DEBUG') is None
-app.debug = True
+app.debug = not (getenv('WEBSEARCH_DEBUG') is None)
 
 
 # ---------------------------------------------------------
@@ -473,14 +472,16 @@ def formatResponse(data, code=200):
     """Format response output."""
     # Format json - return empty
     result = data['result'] if 'result' in data else {}
-    format = 'json'
+    if app.debug and 'debug' in data:
+        result['debug'] = data['debug']
+    output_format = 'json'
     if request.args.get('format'):
-        format = request.args.get('format')
+        output_format = request.args.get('format')
     if 'format' in data:
-        format = data['format']
+        output_format = data['format']
 
     tpl = data['template'] if 'template' in data else 'answer.html'
-    if format == 'html' and tpl is not None:
+    if output_format == 'html' and tpl is not None:
         if 'route' not in data:
             data['route'] = '/'
         return render_template(tpl, rc=(code == 200), **data), code
@@ -1017,15 +1018,17 @@ Date:   11.07.2017
 # returns - result, distance tuple
 def reverse_search(lon, lat, debug):
     result = {
+        'total_found': 0,
         'count': 0,
-        'results': []
+        'matches': []
     }
 
     if debug:
         result['debug'] = {
             'longitude': lon,
             'latitude': lat,
-            'queries': []
+            'queries': [],
+            'results': [],
         }
 
     try:
@@ -1080,37 +1083,39 @@ def reverse_search(lon, lat, debug):
         # limit the result set to the single closest match
         limit = " ORDER BY distance ASC LIMIT 1"
 
-        result = {}
+        myresult = {}
         # form the final queries and execute
         for where in wherelon:
             sql = select + " AND ".join([where, wherelat, whereclass]) + limit
-            if debug:
-                result['debug']['queries'].append(sql)
             # Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
             status, result_new = get_query_result(cursor, sql, ())
-            if 'matches' in result and len(result['matches']) > 0:
-                result = mergeResultObject(result, result_new)
+            if debug:
+                result['debug']['queries'].append(sql)
+                result['debug']['results'].append(result_new)
+            if 'matches' in myresult and len(myresult['matches']) > 0:
+                myresult = mergeResultObject(myresult, result_new)
             else:
-                result = result_new.copy()
+                myresult = result_new.copy()
 
-        count = len(result['matches'])
+        count = len(myresult['matches'])
     db.close()
 
     if debug:
-        result['debug']['matches'] = result['matches']
+        result['debug']['matches'] = myresult['matches']
 
     smallest_row = None
     smallest_distance = None
 
     # For the rows returned, find the smallest calculated distance
     # (the 180 meridian case may result in 2 rows to check)
-    for match in result['matches']:
+    for match in myresult['matches']:
         distance = match['attrs']['distance']
 
         if smallest_row is None or distance < smallest_distance:
             smallest_row = match
             smallest_distance = distance
 
+    result = mergeResultObject(result, myresult)
     result['count'] = 1
     result['matches'] = [smallest_row]
     result['start_index'] = 1
@@ -1152,10 +1157,11 @@ def reverse_search_url(lon, lat):
     code = 200
     result, distance = reverse_search(lon, lat, debug)
     data['result'] = prepareResultJson(result)
-
     if debug:
         times['process'] = time() - times['start']
-        result['debug']['times'] = times
+        data['debug'] = result['debug']
+        data['debug']['distance'] = distance
+        data['debug_times'] = times
 
     return formatResponse(data, code)
 

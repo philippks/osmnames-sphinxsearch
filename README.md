@@ -16,7 +16,7 @@ This endpoint returns 20 results matching the `<query>`.
 
 This endpoint returns 20 results matching the `<query>` within a specific country, identified by the `<country_code` (lowercase ISO 3166 Alpha-2 code).
 
-## Place lookup search: `/r/<longitude>/<latitude>`
+## Place lookup search: `/r/<longitude>/<latitude>.js`
 
 This endpoint returns 1 result matching the shortest distance from [longitude,latitude] to places in the data set.
 

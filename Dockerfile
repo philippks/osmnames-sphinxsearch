@@ -27,7 +27,7 @@ RUN curl -s \
 && rm /tmp/sphinxsearch.deb \
 && easy_install -q flask-cache \
 && pip install -q supervisor \
-&& mkdir -p /var/log/sphinx \
+&& mkdir -p /var/log/sphinxsearch \
 && mkdir -p /var/log/supervisord
 
 VOLUME ["/data/"]

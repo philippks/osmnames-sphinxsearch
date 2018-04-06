@@ -330,7 +330,7 @@ def mergeResultObject(result_old, result_new):
         matches.append(row[1])
         i += 1
         # Append only first #count rows
-        if i >= result_old['count']:
+        if 'count' in result_old and i >= result_old['count']:
             break
 
     result = result_old.copy()

@@ -1014,9 +1014,10 @@ Date:   11.07.2017
 # reverse_search - find the closest place in the data set to the supplied coordinates
 # lon     - float   - the longitude coordinate, in degrees, for the closest place match
 # lat     - float   - the latitude coordinate, in degrees, for the closest place match
+# classes - array   - the array of classes to filter, empty array without filtering
 # debug   - boolean - if true, include diagnostics in the result
 # returns - result, distance tuple
-def reverse_search(lon, lat, debug):
+def reverse_search(lon, lat, classes, debug):
     result = {
         'total_found': 0,
         'count': 0,
@@ -1078,15 +1079,18 @@ def reverse_search(lon, lat, debug):
             wherelon.append("lon BETWEEN {} AND {}".format(lon_min, lon_max))
         # latitude condition is the same for all cases
         wherelat = "lat BETWEEN {} AND {}".format(lat_min, lat_max)
-        # we only consider places in the data set
-        whereclass = "class='place'"
+        whereclass = ""
+        if classes:
+            whereclass = "({})".format(
+                " OR ".join(["class='{}'".format(cl) for cl in classes]))
         # limit the result set to the single closest match
         limit = " ORDER BY distance ASC LIMIT 1"
 
         myresult = {}
         # form the final queries and execute
         for where in wherelon:
-            sql = select + " AND ".join([where, wherelat, whereclass]) + limit
+            sql = select + " AND ".join(filter(None, [where, wherelat, whereclass]))
+            sql += limit
             # Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
             status, result_new = get_query_result(cursor, sql, ())
             if debug:
@@ -1125,8 +1129,9 @@ def reverse_search(lon, lat, debug):
 
 
 # ---------------------------------------------------------
-@app.route('/r/<lon>/<lat>.js')
-def reverse_search_url(lon, lat):
+@app.route('/r/<lon>/<lat>.js', defaults={'classes': None})
+@app.route('/r/<classes>/<lon>/<lat>.js')
+def reverse_search_url(lon, lat, classes):
     """REST API for reverse_search."""
     code = 400
     data = {'format': 'json'}
@@ -1155,7 +1160,11 @@ def reverse_search_url(lon, lat):
         times['prepare'] = time() - times['start']
 
     code = 200
-    result, distance = reverse_search(lon, lat, debug)
+    filter_classes = []
+    if classes:
+        # This argument can be list separated by comma
+        filter_classes = classes.encode('utf-8').split(',')
+    result, distance = reverse_search(lon, lat, filter_classes, debug)
     data['result'] = prepareResultJson(result)
     if debug:
         times['process'] = time() - times['start']
@@ -1166,12 +1175,13 @@ def reverse_search_url(lon, lat):
     return formatResponse(data, code)
 
 
-@app.route('/r/<lon>/<lat>')
-def reverse_search_url_public(lon, lat):
+@app.route('/r/<lon>/<lat>', defaults={'classes': None})
+@app.route('/r/<classes>/<lon>/<lat>')
+def reverse_search_url_public(lon, lat, classes):
     if NOCACHEREDIRECT:
         return redirect(NOCACHEREDIRECT, code=302)
 
-    return reverse_search_url(lon, lat)
+    return reverse_search_url(lon, lat, classes)
 
 # =============================================================================
 # End Reverse geo-coding support

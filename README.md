@@ -24,7 +24,7 @@ This endpoint returns 1 result matching the shortest distance from [longitude,la
 
 This endpoint returns 1 result matching the shortest distance from [longtitude, latitude] to the class specific entry in the data set.
 
-The class option can be comma separated list of values.
+The `class` option can be a comma separated list of values (`/r/place,natural/<lon>/<lat>.js`).
 The list of supported class are based on the processed data.
 For example, using [OSMNames full data set](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.4) contains [these values](https://github.com/OSMNames/OSMNames/blob/v2.0.4/osmnames/export_osmnames/functions.sql): `highway`, `waterway`, `natural`, `boundary`, `place`, `landuse` and `multiple`.
 

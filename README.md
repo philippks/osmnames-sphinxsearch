@@ -18,7 +18,15 @@ This endpoint returns 20 results matching the `<query>` within a specific countr
 
 ## Place lookup search: `/r/<longitude>/<latitude>.js`
 
-This endpoint returns 1 result matching the shortest distance from [longitude,latitude] to places in the data set.
+This endpoint returns 1 result matching the shortest distance from [longitude,latitude] to any entry in the data set.
+
+## Class specific place lookup search: `/r/<class>/<longitude>/<latitude>.js`
+
+This endpoint returns 1 result matching the shortest distance from [longtitude, latitude] to the class specific entry in the data set.
+
+The class option can be comma separated list of values.
+The list of supported class are based on the processed data.
+For example, using [OSMNames full data set](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.4) contains [these values](https://github.com/OSMNames/OSMNames/blob/v2.0.4/osmnames/export_osmnames/functions.sql): `highway`, `waterway`, `natural`, `boundary`, `place`, `landuse` and `multiple`.
 
 # Input data.tsv format
 
@@ -55,7 +63,7 @@ housenumbers
 The source data should be **sorted by the column `importance`**, and include a header row.
 For the description of these columns, see [data format in OSMNames documentation](http://osmnames.readthedocs.io/en/latest/introduction.html#output-format).
 
-If no data is specified then a 100k OSMNames sample is automatically downloaded from from [OSMNames/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.3).
+If no data is specified then a 100k OSMNames sample is automatically downloaded from from [OSMNames/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.4).
 
 # Usage of docker image
 

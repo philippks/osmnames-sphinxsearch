@@ -647,8 +647,8 @@ def search(orig_query, query_filter, autocomplete=False, start=0, count=0,
             lat = degree_to_float(latlon.group(1).strip(), latlon.group(2))
             lon = degree_to_float(latlon.group(3).strip(), latlon.group(4))
     if lat and lon:
-        rev_result, distance = reverse_search(
-            lon, lat, query_filter['class'] or [], debug)
+        classes = query_filter['class'] if 'class' in query_filter else []
+        rev_result, distance = reverse_search(lon, lat, classes, debug)
         matches = [
             {
                 'id': 0,

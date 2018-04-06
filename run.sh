@@ -8,7 +8,7 @@ set -ex
 
 #SOURCE_DIR=/data/osmnames-sphinxsearch
 SOURCE_DIR=`pwd`
-mkdir -p $SOURCE_DIR/data $SOURCE_DIR/tmp $SOURCE_DIR/log
+mkdir -p $SOURCE_DIR/data/input $SOURCE_DIR/data/index $SOURCE_DIR/tmp $SOURCE_DIR/log
 sudo rm -rf $SOURCE_DIR/tmp
 
 docker build -t klokantech/osmnames-sphinxsearch:devel .

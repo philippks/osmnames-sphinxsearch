@@ -1079,27 +1079,28 @@ def reverse_search(lon, lat, classes, debug):
             wherelon.append("lon BETWEEN {} AND {}".format(lon_min, lon_max))
         # latitude condition is the same for all cases
         wherelat = "lat BETWEEN {} AND {}".format(lat_min, lat_max)
-        whereclass = ""
-        if classes:
-            whereclass = "({})".format(
-                " OR ".join(["class='{}'".format(cl) for cl in classes]))
         # limit the result set to the single closest match
         limit = " ORDER BY distance ASC LIMIT 1"
 
         myresult = {}
+        if not classes:
+            classes = [""]
         # form the final queries and execute
         for where in wherelon:
-            sql = select + " AND ".join(filter(None, [where, wherelat, whereclass]))
-            sql += limit
-            # Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
-            status, result_new = get_query_result(cursor, sql, ())
-            if debug:
-                result['debug']['queries'].append(sql)
-                result['debug']['results'].append(result_new)
-            if 'matches' in myresult and len(myresult['matches']) > 0:
-                myresult = mergeResultObject(myresult, result_new)
-            else:
-                myresult = result_new.copy()
+            for cl in classes:
+                sql = select + " AND ".join([where, wherelat])
+                if cl:
+                    sql += " AND class='{}' ".format(cl)
+                sql += limit
+                # Boolean, {'matches': [{'weight': 0, 'id', 'attrs': {}}], 'total_found': 0}
+                status, result_new = get_query_result(cursor, sql, ())
+                if debug:
+                    result['debug']['queries'].append(sql)
+                    result['debug']['results'].append(result_new)
+                if 'matches' in myresult and len(myresult['matches']) > 0:
+                    myresult = mergeResultObject(myresult, result_new)
+                else:
+                    myresult = result_new.copy()
 
         count = len(myresult['matches'])
     db.close()

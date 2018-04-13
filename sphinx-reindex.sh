@@ -3,7 +3,8 @@
 exec &> >(tee -a "/var/log/sphinxsearch/sphinx-reindex.log")
 
 set -e
-echo "Started: "`date "+%Y%m%d %H%M%S"`
+START=`date "+%Y%m%d %H%M%S"`
+echo "Started: $START"
 
 # Download sample 100k file if missing
 if [ ! -f /data/input/data.tsv -a ! -f /data/input/data.tsv.gz ]; then
@@ -30,4 +31,6 @@ if [ -z "`pidof searchd`" ]; then
     supervisorctl -c /etc/supervisor/supervisord.conf start sphinx
 fi
 
+echo "Started: $START"
 echo "Finished: "`date "+%Y%m%d %H%M%S"`
+echo "========"

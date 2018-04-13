@@ -430,7 +430,7 @@ def parseDisplayName(row):
 
 def prepareNameSuffix(results):
     """Parse and prepare name_suffix based on results."""
-    counts = {'country_code': [], 'state': [], 'city': [], 'name': []}
+    counts = {'country_code': [], 'state': [], 'city': [], 'name': [], 'county': []}
 
     # Separate different country codes
     for row in results:
@@ -457,6 +457,8 @@ def prepareNameSuffix(results):
                 name_suffix.append(row['city'])
             if row['country_code'] == 'us' and len(counts['state']) > 1 and len(row['state']) > 0:
                 name_suffix.append(row['state'])
+            if len(counts['county']) > 1:
+                name_suffix.append(row['county'])
             if len(counts['country_code']) > 1:
                 name_suffix.append(row['country_code'].upper())
             row['name_suffix'] = ', '.join(name_suffix)

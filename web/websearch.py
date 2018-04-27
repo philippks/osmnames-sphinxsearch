@@ -367,7 +367,10 @@ def prepareResultJson(result):
         res = {'rank': row['weight'], 'id': row['id']}
         for attr in r:
             if isinstance(r[attr], str):
-                res[attr] = r[attr].decode('utf-8')
+                try:
+                    res[attr] = r[attr].decode('utf-8')
+                except:
+                    res[attr] = r[attr]
             else:
                 res[attr] = r[attr]
         # Prepare bounding box from West/South/East/North attributes

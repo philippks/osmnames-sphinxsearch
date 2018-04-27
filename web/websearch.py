@@ -21,6 +21,7 @@ import re
 import natsort
 import rfc822   # Used for parsing RFC822 into datetime
 import email    # Used for formatting TS into RFC822
+import traceback
 
 
 # Prepare global variables
@@ -851,19 +852,24 @@ def search_url(country_code, query):
         data['result'] = {}
         return formatResponse(data, 304)
 
-    if country_code is not None:
-        if len(country_code) > 3:
-            data['result'] = {'message': 'Invalid country code value.'}
-            return formatResponse(data, code)
-        query_filter = {'country_code': country_code.encode('utf-8').split(',')}
+    try:
+        if country_code is not None:
+            if len(country_code) > 3:
+                data['result'] = {'message': 'Invalid country code value.'}
+                return formatResponse(data, code)
+            query_filter = {'country_code': country_code.encode('utf-8').split(',')}
 
-    # Common search for query with filters
-    rc, result = search(query.encode('utf-8'), query_filter, autocomplete)
-    if rc and len(result['matches']) > 0:
-        code = 200
+        # Common search for query with filters
+        rc, result = search(query.encode('utf-8'), query_filter, autocomplete)
+        if rc and len(result['matches']) > 0:
+            code = 200
 
-    data['query'] = query
-    data['result'] = prepareResultJson(result)
+        data['query'] = query
+        data['result'] = prepareResultJson(result)
+    except:
+        traceback.print_exc()
+        data['result'] = {'message': 'Unexpected failure to handle this request. Please, contact sysadmin.'}
+        code = 500
 
     return formatResponse(data, code)
 
@@ -1146,38 +1152,43 @@ def reverse_search_url(lon, lat, classes):
     debug = request.args.get('debug')
     times = {}
 
-    if debug:
-        times['start'] = time()
-
     try:
-        lon = float(lon)
-        lat = float(lat)
+        if debug:
+            times['start'] = time()
+
+        try:
+            lon = float(lon)
+            lat = float(lat)
+        except:
+            data['result'] = {'message': 'Longitude and latitude must be numeric.'}
+            return formatResponse(data, code)
+
+        if lon < -180.0 or lon > 180.0:
+            data['result'] = {'message': 'Invalid longitude.'}
+            return formatResponse(data, code)
+        if lat < -90.0 or lat > 90.0:
+            data['result'] = {'message': 'Invalid latitude.'}
+            return formatResponse(data, code)
+
+        if debug:
+            times['prepare'] = time() - times['start']
+
+        code = 200
+        filter_classes = []
+        if classes:
+            # This argument can be list separated by comma
+            filter_classes = classes.encode('utf-8').split(',')
+        result, distance = reverse_search(lon, lat, filter_classes, debug)
+        data['result'] = prepareResultJson(result)
+        if debug:
+            times['process'] = time() - times['start']
+            data['debug'] = result['debug']
+            data['debug']['distance'] = distance
+            data['debug_times'] = times
     except:
-        data['result'] = {'message': 'Longitude and latitude must be numeric.'}
-        return formatResponse(data, code)
-
-    if lon < -180.0 or lon > 180.0:
-        data['result'] = {'message': 'Invalid longitude.'}
-        return formatResponse(data, code)
-    if lat < -90.0 or lat > 90.0:
-        data['result'] = {'message': 'Invalid latitude.'}
-        return formatResponse(data, code)
-
-    if debug:
-        times['prepare'] = time() - times['start']
-
-    code = 200
-    filter_classes = []
-    if classes:
-        # This argument can be list separated by comma
-        filter_classes = classes.encode('utf-8').split(',')
-    result, distance = reverse_search(lon, lat, filter_classes, debug)
-    data['result'] = prepareResultJson(result)
-    if debug:
-        times['process'] = time() - times['start']
-        data['debug'] = result['debug']
-        data['debug']['distance'] = distance
-        data['debug_times'] = times
+        traceback.print_exc()
+        data['result'] = {'message': 'Unexpected failure to handle this request. Please, contact sysadmin.'}
+        code = 500
 
     return formatResponse(data, code)
 

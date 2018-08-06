@@ -859,8 +859,21 @@ def search_url(country_code, query):
                 return formatResponse(data, code)
             query_filter = {'country_code': country_code.encode('utf-8').split(',')}
 
+        start = 0
+        count = 0
+        if request.args.get('startIndex'):
+            try:
+                start = int(request.args.get('startIndex'))
+            except:
+                pass
+        if request.args.get('count'):
+            try:
+                count = int(request.args.get('count'))
+            except:
+                pass
+
         # Common search for query with filters
-        rc, result = search(query.encode('utf-8'), query_filter, autocomplete)
+        rc, result = search(query.encode('utf-8'), query_filter, autocomplete, start, count)
         if rc and len(result['matches']) > 0:
             code = 200
 

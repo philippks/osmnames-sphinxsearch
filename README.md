@@ -1,8 +1,9 @@
 # osmnames-sphinxsearch
+## [Docker auto-build](https://hub.docker.com/r/klokantech/osmnames-sphinxsearch/): [![](https://images.microbadger.com/badges/image/klokantech/osmnames-sphinxsearch:2.0.6.svg)](https://microbadger.com/images/klokantech/osmnames-sphinxsearch:2.0.6 "Get your own image badge on microbadger.com") [![](https://images.microbadger.com/badges/version/klokantech/osmnames-sphinxsearch:2.0.6.svg)](https://microbadger.com/images/klokantech/osmnames-sphinxsearch:2.0.6 "Get your own version badge on microbadger.com")
 
 Nominatim JSON API replacement made with osmnames.org data indexed by sphinx search
 
-Using data from https://github.com/OSMNames/OSMNames - Database of geographic place names from OpenStreetMap for full text search downloadable for free. Website: http://osmnames.org
+Using data from https://github.com/OSMNames/OSMNames - Database of geographic place names from OpenStreetMap for full text search downloadable for free. Website: https://www.osmnames.org
 
 
 # REST API
@@ -61,13 +62,13 @@ housenumbers
 ```
 
 The source data should be **sorted by the column `importance`**, and include a header row.
-For the description of these columns, see [data format in OSMNames documentation](http://osmnames.readthedocs.io/en/latest/introduction.html#output-format).
+For the description of these columns, see [data format in OSMNames documentation](https://osmnames.readthedocs.io/en/latest/introduction.html#output-format).
 
 If no data is specified then a 100k OSMNames sample is automatically downloaded from from [OSMNames/OSMNames](https://github.com/OSMNames/OSMNames/releases/tag/v2.0.4).
 
 # Usage of docker image
 
-This docker image consists of our OSMNames Websearch (REST API), SphinxSearch and nginx.
+This [docker image](https://hub.docker.com/r/klokantech/osmnames-sphinxsearch/) consists of our OSMNames Websearch (REST API), SphinxSearch and nginx.
 
 The whole service can be run from command-line with one command:
 
@@ -119,6 +120,6 @@ This operation takes longer on a source with more lines, and requires more space
 
 A demo sample data with 100 000 lines has **8.15 MiB gzip** source data file and requires storage space of **314 MiB for the index** folder. The operation takes (on average) 33 seconds.
 
-The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v2.0.3/planet-latest_geonames.tsv.gz) with 23 million lines requires storage space of **34 GiB for the index** folder. The operation takes (on average) 22 minutes.
+The [full planet source data](https://github.com/OSMNames/OSMNames/releases/download/v2.0.4/planet-latest_geonames.tsv.gz) with 23 million lines requires storage space of **34 GiB for the index** folder. The operation takes (on average) 22 minutes.
 
 The indexing is done automatically (if a particular index file is missing) via the `sphinx-reindex.sh` script. You can use this script to force run the index operation as well: `$ time bash sphinx-reindex.sh force`.
